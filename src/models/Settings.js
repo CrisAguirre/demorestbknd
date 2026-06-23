@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const settingsSchema = new mongoose.Schema({
-  storeName: { type: String, default: 'Daily Mart' },
+  storeName: { type: String, default: "La Soupe a l'Oignon" },
   logoUrl: { type: String, default: '' },
   phone: { type: String, default: '' },
   address: { type: String, default: 'Carrera 5 # 16-11, Miraflores' },
