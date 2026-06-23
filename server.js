@@ -26,8 +26,10 @@ const supplierRoutes = require('./src/routes/supplier.routes');
 const purchaseRoutes = require('./src/routes/purchase.routes');
 const expenseRoutes = require('./src/routes/expense.routes');
 const financeRoutes = require('./src/routes/finance.routes');
-const debtorRoutes  = require('./src/routes/debtor.routes');
-
+const ingredientRoutes = require('./src/routes/ingredient.routes');
+const dishRoutes = require('./src/routes/dish.routes');
+const staffRoutes = require('./src/routes/staff.routes');
+const ticketbookRoutes = require('./src/routes/ticketbook.routes');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -63,8 +65,10 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/finance', financeRoutes);
-app.use('/api/debtors', debtorRoutes);
-
+app.use('/api/ingredients', ingredientRoutes);
+app.use('/api/dishes', dishRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/ticketbooks', ticketbookRoutes);
 // Ruta de health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), app: "La Soupe a l'Oignon API" });
