@@ -71,22 +71,6 @@ exports.registerClient = async (req, res, next) => {
   }
 };
 
-exports.loginGuest = async (req, res, next) => {
-  try {
-    const guestId = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-    const guestUser = await User.create({
-      name: 'Invitado',
-      email: `guest-${guestId}@demostore.com`,
-      passwordHash: guestId,
-      role: 'invitado'
-    });
-    
-    const tokens = generateTokens(guestUser._id);
-    res.status(201).json({ message: 'Sesión de invitado iniciada', user: guestUser.toJSON(), ...tokens });
-  } catch (error) {
-    next(error);
-  }
-};
 
 exports.refreshToken = async (req, res, next) => {
   try {
