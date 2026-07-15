@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed": "node src/utils/seedAdmin.js"
+    "seed": "node src/utils/seedAdmin.js",
+    "seed:menu": "node src/utils/seedMenu.js",
+    "seed:all": "node src/utils/seedAdmin.js && node src/utils/seedMenu.js"
   },
   "repository": {
     "type": "git",

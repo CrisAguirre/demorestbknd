@@ -1,8 +1,11 @@
 const Dish = require('../models/Dish');
+const Ingredient = require('../models/Ingredient');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const dishes = await Dish.find({ isAvailable: true }).sort({ category: 1, name: 1 });
+    const dishes = await Dish.find({ isAvailable: true })
+      .populate('ingredients.ingredient')
+      .sort({ category: 1, name: 1 });
     res.json(dishes);
   } catch (error) {
     next(error);
@@ -11,8 +14,18 @@ exports.getAll = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
+    const { ingredients, ...dishData } = req.body;
+    if (ingredients && ingredients.length > 0) {
+      for (const item of ingredients) {
+        const ing = await Ingredient.findById(item.ingredient);
+        if (!ing) {
+          return res.status(400).json({ message: `Ingrediente ${item.ingredient} no encontrado` });
+        }
+      }
+    }
     const dish = await Dish.create(req.body);
-    res.status(201).json(dish);
+    const populated = await dish.populate('ingredients.ingredient');
+    res.status(201).json(populated);
   } catch (error) {
     next(error);
   }
@@ -20,9 +33,18 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
   try {
+    const { ingredients, ...dishData } = req.body;
+    if (ingredients && ingredients.length > 0) {
+      for (const item of ingredients) {
+        const ing = await Ingredient.findById(item.ingredient);
+        if (!ing) {
+          return res.status(400).json({ message: `Ingrediente ${item.ingredient} no encontrado` });
+        }
+      }
+    }
     const dish = await Dish.findByIdAndUpdate(req.params.id, req.body, {
       new: true, runValidators: true
-    });
+    }).populate('ingredients.ingredient');
     if (!dish) return res.status(404).json({ message: 'Plato no encontrado' });
     res.json(dish);
   } catch (error) {
@@ -35,6 +57,106 @@ exports.remove = async (req, res, next) => {
     const dish = await Dish.findByIdAndUpdate(req.params.id, { isAvailable: false }, { new: true });
     if (!dish) return res.status(404).json({ message: 'Plato no encontrado' });
     res.json({ message: 'Plato desactivado' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getRecipeCost = async (req, res, next) => {
+  try {
+    const dish = await Dish.findById(req.params.id).populate('ingredients.ingredient');
+    if (!dish) return res.status(404).json({ message: 'Plato no encontrado' });
+    const recipeCost = dish.ingredients.reduce((sum, item) => {
+      return sum + (item.ingredient?.cost || 0) * item.quantity;
+    }, 0);
+    const margin = dish.price > 0 ? ((dish.price - recipeCost) / dish.price * 100).toFixed(1) : 0;
+    res.json({
+      dishId: dish._id,
+      dishName: dish.name,
+      salePrice: dish.price,
+      recipeCost: Math.round(recipeCost * 100) / 100,
+      margin: Number(margin),
+      ingredients: dish.ingredients.map(i => ({
+        name: i.ingredient?.name || 'Eliminado',
+        quantity: i.quantity,
+        unit: i.ingredient?.unit || 'unidades',
+        costPerUnit: i.ingredient?.cost || 0,
+        subtotal: Math.round((i.ingredient?.cost || 0) * i.quantity * 100) / 100
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.checkAvailability = async (req, res, next) => {
+  try {
+    const dish = await Dish.findById(req.params.id).populate('ingredients.ingredient');
+    if (!dish) return res.status(404).json({ message: 'Plato no encontrado' });
+
+    const missing = [];
+    for (const item of dish.ingredients) {
+      const ing = item.ingredient;
+      if (!ing) {
+        missing.push({ ingredient: 'Eliminado', quantity: item.quantity, available: 0 });
+        continue;
+      }
+      if (ing.stock < item.quantity) {
+        missing.push({
+          ingredient: ing.name,
+          required: item.quantity,
+          available: ing.stock,
+          deficit: Math.round((item.quantity - ing.stock) * 100) / 100
+        });
+      }
+    }
+
+    res.json({
+      dishId: dish._id,
+      dishName: dish.name,
+      available: missing.length === 0,
+      missing
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.batchCheckAvailability = async (req, res, next) => {
+  try {
+    const { dishIds } = req.body;
+    if (!dishIds || !Array.isArray(dishIds)) {
+      return res.status(400).json({ message: 'Se requiere un array dishIds' });
+    }
+
+    const dishes = await Dish.find({ _id: { $in: dishIds } }).populate('ingredients.ingredient');
+    const results = [];
+
+    for (const dish of dishes) {
+      const missing = [];
+      for (const item of dish.ingredients) {
+        const ing = item.ingredient;
+        if (!ing) {
+          missing.push({ ingredient: 'Eliminado', quantity: item.quantity, available: 0 });
+          continue;
+        }
+        if (ing.stock < item.quantity) {
+          missing.push({
+            ingredient: ing.name,
+            required: item.quantity,
+            available: ing.stock
+          });
+        }
+      }
+      results.push({
+        dishId: dish._id,
+        dishName: dish.name,
+        available: missing.length === 0,
+        missing
+      });
+    }
+
+    res.json(results);
   } catch (error) {
     next(error);
   }
