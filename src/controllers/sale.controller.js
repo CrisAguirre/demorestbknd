@@ -3,10 +3,11 @@ const Product = require('../models/Product');
 const Dish = require('../models/Dish');
 const Ingredient = require('../models/Ingredient');
 const Alert = require('../models/Alert');
+const Table = require('../models/Table');
 
 exports.create = async (req, res, next) => {
   try {
-    const { items, paymentMethod, customerName, notes } = req.body;
+    const { items, paymentMethod, customerName, notes, tableNumber } = req.body;
     if (!items || items.length === 0) {
       return res.status(400).json({ message: 'La venta debe tener al menos un item' });
     }
@@ -95,6 +96,16 @@ exports.create = async (req, res, next) => {
       customerName: customerName || 'Cliente general',
       notes
     });
+
+    if (tableNumber) {
+      const table = await Table.findOne({ number: tableNumber });
+      if (table && !table.isOccupied) {
+        table.isOccupied = true;
+        table.currentSale = sale._id;
+        table.occupiedAt = new Date();
+        await table.save();
+      }
+    }
 
     res.status(201).json(sale);
   } catch (error) {

@@ -30,6 +30,7 @@ const ingredientRoutes = require('./src/routes/ingredient.routes');
 const dishRoutes = require('./src/routes/dish.routes');
 const staffRoutes = require('./src/routes/staff.routes');
 const ticketbookRoutes = require('./src/routes/ticketbook.routes');
+const tableRoutes = require('./src/routes/table.routes');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -69,6 +70,7 @@ app.use('/api/ingredients', ingredientRoutes);
 app.use('/api/dishes', dishRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/ticketbooks', ticketbookRoutes);
+app.use('/api/tables', tableRoutes);
 // Ruta de health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), app: "La Soupe a l'Oignon API" });
