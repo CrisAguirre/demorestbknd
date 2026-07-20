@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, required: [true, 'La contraseña es requerida'] },
   phone: { type: String, trim: true },
   address: { type: String, trim: true },
-  role: { type: String, enum: ['admin', 'cajero', 'cliente', 'invitado'], default: 'cajero' },
+  role: { type: String, enum: ['admin', 'cajero', 'cliente', 'invitado', 'cocinero', 'mesero'], default: 'cajero' },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

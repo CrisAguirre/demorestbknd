@@ -4,6 +4,7 @@ const Dish = require('../models/Dish');
 const Ingredient = require('../models/Ingredient');
 const Alert = require('../models/Alert');
 const Table = require('../models/Table');
+const KitchenOrder = require('../models/KitchenOrder');
 
 exports.create = async (req, res, next) => {
   try {
@@ -105,6 +106,23 @@ exports.create = async (req, res, next) => {
         table.occupiedAt = new Date();
         await table.save();
       }
+    }
+
+    if (tableNumber) {
+      await KitchenOrder.create({
+        sale: sale._id,
+        tableNumber,
+        items: saleItems.map(i => ({
+          product: i.product,
+          productName: i.productName,
+          quantity: i.quantity
+        })),
+        status: 'nuevo',
+        stateHistory: [{
+          state: 'nuevo',
+          timestamp: new Date()
+        }]
+      });
     }
 
     res.status(201).json(sale);

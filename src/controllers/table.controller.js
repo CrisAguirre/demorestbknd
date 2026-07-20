@@ -2,7 +2,7 @@ const Table = require('../models/Table');
 
 exports.getAll = async (req, res, next) => {
   try {
-    let tables = await Table.find().sort({ number: 1 }).populate('currentSale', 'total createdAt');
+    let tables = await Table.find().sort({ number: 1 }).populate({ path: 'currentSale', select: 'total createdAt' });
     if (tables.length === 0) {
       const initial = [];
       for (let i = 1; i <= 16; i++) {
