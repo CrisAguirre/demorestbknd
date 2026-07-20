@@ -17,7 +17,10 @@ const kitchenOrderItemSchema = new mongoose.Schema({
 const kitchenOrderSchema = new mongoose.Schema({
   sale: { type: mongoose.Schema.Types.ObjectId, ref: 'Sale', required: true },
   tableNumber: { type: Number },
-  items: [kitchenOrderItemSchema],
+  items: {
+    type: [kitchenOrderItemSchema],
+    validate: [v => v.length > 0, 'Debe tener al menos un item']
+  },
   status: {
     type: String,
     enum: ['nuevo', 'en_preparacion', 'entregado', 'pagado'],

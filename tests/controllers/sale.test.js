@@ -9,6 +9,8 @@ const Dish = require('../../src/models/Dish');
 const Ingredient = require('../../src/models/Ingredient');
 const Sale = require('../../src/models/Sale');
 const Alert = require('../../src/models/Alert');
+const Table = require('../../src/models/Table');
+const KitchenOrder = require('../../src/models/KitchenOrder');
 
 let app, adminToken, admin, category, supplier, product, ingredient, dish;
 
@@ -37,6 +39,23 @@ describe('Sale Controller', () => {
     expect(res.body.total).toBe(7500);
     const updated = await Product.findById(product._id);
     expect(updated.stock).toBe(47);
+  });
+
+  it('should create KitchenOrder when sale has tableNumber', async () => {
+    await Table.create({ number: 5, isOccupied: false });
+    const res = await request(app).post('/api/sales').set('Authorization', `Bearer ${adminToken}`).send({
+      items: [{ product: product._id, quantity: 2 }],
+      tableNumber: 5
+    });
+    expect(res.status).toBe(201);
+    const kitchenOrders = await KitchenOrder.find({ tableNumber: 5 });
+    expect(kitchenOrders).toHaveLength(1);
+    expect(kitchenOrders[0].status).toBe('nuevo');
+    expect(kitchenOrders[0].items).toHaveLength(1);
+    expect(kitchenOrders[0].items[0].productName).toBe('Test Product');
+    const table = await Table.findOne({ number: 5 });
+    expect(table.isOccupied).toBe(true);
+    expect(table.currentSale.toString()).toBe(res.body._id);
   });
 
   it('should create a sale with dish items (deduct ingredients)', async () => {

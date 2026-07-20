@@ -125,6 +125,34 @@ async function createTestDish(overrides = {}) {
   });
 }
 
+async function createTestTable(overrides = {}) {
+  const Table = require('../src/models/Table');
+  return await Table.create({
+    number: overrides.number || 1,
+    isOccupied: false,
+    ...overrides
+  });
+}
+
+async function createTestKitchenOrder(overrides = {}) {
+  const KitchenOrder = require('../src/models/KitchenOrder');
+  const Sale = require('../src/models/Sale');
+  const ObjectId = mongoose.Types.ObjectId;
+  if (!overrides.sale) {
+    const user = await createTestUser();
+    const sale = await Sale.create({ user: user._id, items: [{ product: new ObjectId(), productName: 'Test', quantity: 1, unitPrice: 100, subtotal: 100 }], total: 100 });
+    overrides.sale = sale._id;
+  }
+  return await KitchenOrder.create({
+    sale: overrides.sale,
+    tableNumber: 1,
+    items: [{ product: new ObjectId(), productName: 'Test Item', quantity: 2 }],
+    status: 'nuevo',
+    stateHistory: [{ state: 'nuevo', timestamp: new Date() }],
+    ...overrides
+  });
+}
+
 async function createTestCashClosing(overrides = {}) {
   const CashClosing = require('../src/models/CashClosing');
   return await CashClosing.create({
@@ -147,5 +175,7 @@ module.exports = {
   createTestProduct,
   createTestIngredient,
   createTestDish,
+  createTestTable,
+  createTestKitchenOrder,
   createTestCashClosing
 };
