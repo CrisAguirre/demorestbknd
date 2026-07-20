@@ -1,0 +1,59 @@
+const request = require('supertest');
+const express = require('express');
+const mongoose = require('mongoose');
+const { connectDB, closeDB, clearDB, createTestCategory, createTestSupplier } = require('../helpers');
+const reportRoutes = require('../../src/routes/report.routes');
+const User = require('../../src/models/User');
+const Product = require('../../src/models/Product');
+const Sale = require('../../src/models/Sale');
+
+let app, adminToken, admin, category, supplier, product;
+
+beforeAll(async () => {
+  await connectDB();
+  app = express();
+  app.use(express.json());
+  app.use('/api/reports', reportRoutes);
+});
+afterAll(async () => { await closeDB(); });
+beforeEach(async () => {
+  await clearDB();
+  admin = await User.create({ name: 'Admin', email: 'a@test.com', passwordHash: 'Pass123!', role: 'admin' });
+  adminToken = require('jsonwebtoken').sign({ id: admin._id }, process.env.JWT_SECRET);
+  category = await createTestCategory();
+  supplier = await createTestSupplier();
+  product = await Product.create({ name: 'Prod', barcode: 'PRD01', category: category._id, supplier: supplier._id, purchasePrice: 1000, salePrice: 2000, stock: 10 });
+});
+
+describe('Report Controller', () => {
+  it('should return sales summary KPIs', async () => {
+    await Sale.create({ user: admin._id, items: [{ product: product._id, productName: 'P', quantity: 2, unitPrice: 2000, subtotal: 4000 }], total: 4000 });
+    const res = await request(app).get('/api/reports/sales-summary').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.totalRevenue).toBe(4000);
+    expect(res.body.totalTransactions).toBe(1);
+  });
+
+  it('should return top products', async () => {
+    await Sale.create({ user: admin._id, items: [{ product: product._id, productName: 'Top', quantity: 5, unitPrice: 2000, subtotal: 10000 }], total: 10000 });
+    const res = await request(app).get('/api/reports/top-products').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body[0].totalQuantity).toBe(5);
+  });
+
+  it('should return inventory valuation', async () => {
+    const res = await request(app).get('/api/reports/inventory-valuation').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.totalProducts).toBe(1);
+    expect(res.body.totalUnits).toBe(10);
+    expect(res.body.totalCostValue).toBe(10000);
+    expect(res.body.totalSaleValue).toBe(20000);
+  });
+
+  it('should return profit margins', async () => {
+    const res = await request(app).get('/api/reports/profit-margins').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body[0].margin).toBe(1000);
+    expect(res.body[0].marginPercent).toBe(100);
+  });
+});
