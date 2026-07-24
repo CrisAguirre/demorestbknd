@@ -10,6 +10,7 @@ const settingsSchema = new mongoose.Schema({
     primaryNeon: { type: String, default: '#D4AF37' },
     secondaryNeon: { type: String, default: '#8B5A2B' }
   },
+  manualUrl: { type: String, default: '' },
   email: {
     host: { type: String, default: '' },
     port: { type: Number, default: 587 },

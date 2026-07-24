@@ -47,3 +47,15 @@ exports.update = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.uploadManual = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No se recibió el archivo PDF' });
+    const settings = await Settings.getSettings();
+    settings.manualUrl = `/uploads/${req.file.filename}`;
+    await settings.save();
+    res.json({ manualUrl: settings.manualUrl });
+  } catch (error) {
+    next(error);
+  }
+};
