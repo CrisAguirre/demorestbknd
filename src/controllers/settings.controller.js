@@ -24,7 +24,7 @@ exports.update = async (req, res, next) => {
     if (address) settings.address = address;
     if (whatsappNumber) settings.whatsappNumber = whatsappNumber;
     if (theme) settings.theme = { ...settings.theme, ...theme };
-    if (email) {
+    if (email && typeof email === 'object') {
       settings.email = {
         host: email.host || settings.email?.host || '',
         port: Number(email.port) || settings.email?.port || 587,

@@ -76,4 +76,37 @@ describe('Report Controller', () => {
     expect(res.body.totalCompleted).toBe(1);
     expect(Number(res.body.avgTotalMin)).toBeGreaterThan(0);
   });
+
+  // ── CSV Export tests ──
+
+  describe('CSV exports', () => {
+    it('should export sales summary as CSV', async () => {
+      await Sale.create({ user: admin._id, items: [{ product: product._id, productName: 'P', quantity: 2, unitPrice: 2000, subtotal: 4000 }], total: 4000 });
+      const res = await request(app).get('/api/reports/export/sales-summary').set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/csv');
+      expect(res.text).toContain('Fecha,Hora,ID Venta,Cliente,Método Pago,Items,Total');
+    });
+
+    it('should export top products as CSV', async () => {
+      await Sale.create({ user: admin._id, items: [{ product: product._id, productName: 'TopProduct', quantity: 3, unitPrice: 2000, subtotal: 6000 }], total: 6000 });
+      const res = await request(app).get('/api/reports/export/top-products').set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/csv');
+      expect(res.text).toContain('TopProduct');
+    });
+
+    it('should export inventory as CSV', async () => {
+      const res = await request(app).get('/api/reports/export/inventory').set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/csv');
+      expect(res.text).toContain('Prod');
+      expect(res.text).toContain('Estado');
+    });
+
+    it('should require auth for CSV export', async () => {
+      const res = await request(app).get('/api/reports/export/sales-summary');
+      expect(res.status).toBe(401);
+    });
+  });
 });
