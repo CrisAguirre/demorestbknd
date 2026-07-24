@@ -15,17 +15,17 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ message: 'Email y contraseña son requeridos' });
+      return res.status(400).json({ message: 'Email y contrase\u00f1a son requeridos' });
     }
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user || !user.isActive) {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
+      return res.status(401).json({ message: 'Credenciales inv\u00e1lidas' });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
+      return res.status(401).json({ message: 'Credenciales inv\u00e1lidas' });
     }
 
     const tokens = generateTokens(user._id);
@@ -40,7 +40,7 @@ exports.register = async (req, res, next) => {
     const { name, email, password, role, phone, address } = req.body;
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ message: 'El email ya está registrado' });
+      return res.status(400).json({ message: 'El email ya est\u00e1 registrado' });
     }
 
     const user = await User.create({
@@ -57,7 +57,7 @@ exports.registerClient = async (req, res, next) => {
     const { name, email, phone, address, password } = req.body;
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ message: 'El email ya está registrado' });
+      return res.status(400).json({ message: 'El email ya est\u00e1 registrado' });
     }
 
     const user = await User.create({
@@ -82,13 +82,13 @@ exports.refreshToken = async (req, res, next) => {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id);
     if (!user || !user.isActive) {
-      return res.status(401).json({ message: 'Token inválido' });
+      return res.status(401).json({ message: 'Token inv\u00e1lido' });
     }
 
     const tokens = generateTokens(user._id);
     res.json(tokens);
   } catch (error) {
-    return res.status(401).json({ message: 'Token inválido o expirado' });
+    return res.status(401).json({ message: 'Token inv\u00e1lido o expirado' });
   }
 };
 
@@ -120,12 +120,56 @@ exports.changePassword = async (req, res, next) => {
 
     const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Contraseña actual incorrecta' });
+      return res.status(400).json({ message: 'Contrase\u00f1a actual incorrecta' });
     }
 
     user.passwordHash = newPassword;
     await user.save();
-    res.json({ message: 'Contraseña actualizada exitosamente' });
+    res.json({ message: 'Contrase\u00f1a actualizada exitosamente' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Admin: get all users
+exports.getAllUsers = async (req, res, next) => {
+  try {
+    const { role } = req.query;
+    const filter = {};
+    if (role) filter.role = role;
+    const users = await User.find(filter).select('-passwordHash').sort({ name: 1 });
+    res.json(users);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Admin: update user (name, email, role, isActive)
+exports.updateUser = async (req, res, next) => {
+  try {
+    const { name, email, role, isActive, password } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (role) user.role = role;
+    if (isActive !== undefined) user.isActive = isActive;
+    if (password) user.passwordHash = password;
+
+    await user.save();
+    res.json(user.toJSON());
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Admin: delete (deactivate) user
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+    res.json({ message: 'Usuario desactivado' });
   } catch (error) {
     next(error);
   }

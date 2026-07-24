@@ -6,6 +6,7 @@ const reportRoutes = require('../../src/routes/report.routes');
 const User = require('../../src/models/User');
 const Product = require('../../src/models/Product');
 const Sale = require('../../src/models/Sale');
+const KitchenOrder = require('../../src/models/KitchenOrder');
 
 let app, adminToken, admin, category, supplier, product;
 
@@ -55,5 +56,24 @@ describe('Report Controller', () => {
     expect(res.status).toBe(200);
     expect(res.body[0].margin).toBe(1000);
     expect(res.body[0].marginPercent).toBe(100);
+  });
+
+  it('should return preparation times', async () => {
+    const now = new Date();
+    await KitchenOrder.create({
+      sale: new mongoose.Types.ObjectId(),
+      tableNumber: 5,
+      items: [{ product: new mongoose.Types.ObjectId(), productName: 'Pizza', quantity: 2 }],
+      status: 'entregado',
+      stateHistory: [
+        { state: 'nuevo', timestamp: new Date(now - 600000) },
+        { state: 'en_preparacion', timestamp: new Date(now - 300000) },
+        { state: 'entregado', timestamp: now }
+      ]
+    });
+    const res = await request(app).get('/api/reports/preparation-times').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.totalCompleted).toBe(1);
+    expect(Number(res.body.avgTotalMin)).toBeGreaterThan(0);
   });
 });

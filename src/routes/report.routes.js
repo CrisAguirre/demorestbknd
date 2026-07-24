@@ -11,5 +11,10 @@ router.get('/sales-by-payment', authMiddleware, role('admin'), ctrl.salesByPayme
 router.get('/sales-by-hour', authMiddleware, role('admin'), ctrl.salesByHour);
 router.get('/inventory-valuation', authMiddleware, role('admin'), ctrl.inventoryValuation);
 router.get('/profit-margins', authMiddleware, role('admin'), ctrl.profitMargins);
+router.get('/preparation-times', authMiddleware, role('admin'), ctrl.preparationTimes);
+
+router.get('/export/sales-summary', authMiddleware, role('admin'), ctrl.exportSalesSummaryCSV);
+router.get('/export/top-products', authMiddleware, role('admin'), ctrl.exportTopProductsCSV);
+router.get('/export/inventory', authMiddleware, role('admin'), ctrl.exportInventoryCSV);
 
 module.exports = router;

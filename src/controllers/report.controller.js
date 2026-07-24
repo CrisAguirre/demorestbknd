@@ -1,6 +1,7 @@
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
+const KitchenOrder = require('../models/KitchenOrder');
 
 // Helper: build start date from period
 function getStartDate(period) {
@@ -269,4 +270,184 @@ exports.profitMargins = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+// Preparation Times
+exports.preparationTimes = async (req, res, next) => {
+  try {
+    const { period = 'month', cookId } = req.query;
+    const startDate = getStartDate(period);
+
+    const match = { createdAt: { $gte: startDate }, status: { $in: ['entregado', 'pagado'] } };
+    if (cookId) match.assignedCook = cookId;
+
+    const orders = await KitchenOrder.find(match)
+      .populate('assignedCook', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const times = orders.map(o => {
+      const getTs = (state) => o.stateHistory?.find(h => h.state === state)?.timestamp;
+      const nuevo = getTs('nuevo') || o.createdAt;
+      const preparacion = getTs('en_preparacion');
+      const entregado = getTs('entregado');
+
+      return {
+        _id: o._id,
+        tableNumber: o.tableNumber,
+        items: o.items.length,
+        cook: o.assignedCook?.name || 'N/A',
+        acceptanceTime: preparacion ? (new Date(preparacion) - new Date(nuevo)) / 60000 : null,
+        prepTime: entregado && preparacion ? (new Date(entregado) - new Date(preparacion)) / 60000 : null,
+        totalTime: entregado ? (new Date(entregado) - new Date(nuevo)) / 60000 : null,
+        createdAt: o.createdAt
+      };
+    });
+
+    const completed = times.filter(t => t.totalTime !== null);
+    const avgAcceptance = completed.reduce((s, t) => s + (t.acceptanceTime || 0), 0) / (completed.length || 1);
+    const avgPrep = completed.reduce((s, t) => s + (t.prepTime || 0), 0) / (completed.length || 1);
+    const avgTotal = completed.reduce((s, t) => s + t.totalTime, 0) / (completed.length || 1);
+
+    const byCook = {};
+    completed.forEach(t => {
+      if (!byCook[t.cook]) byCook[t.cook] = { cook: t.cook, orders: 0, totalPrep: 0 };
+      byCook[t.cook].orders++;
+      byCook[t.cook].totalPrep += t.prepTime || 0;
+    });
+    const cookStats = Object.values(byCook).map(c => ({
+      ...c,
+      avgPrepTime: c.orders > 0 ? (c.totalPrep / c.orders).toFixed(1) : 0
+    })).sort((a, b) => a.avgPrepTime - b.avgPrepTime);
+
+    res.json({
+      period,
+      totalCompleted: completed.length,
+      totalOrders: orders.length,
+      avgAcceptanceMin: avgAcceptance.toFixed(1),
+      avgPrepMin: avgPrep.toFixed(1),
+      avgTotalMin: avgTotal.toFixed(1),
+      byCook: cookStats,
+      orders: times.slice(0, 50)
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── 10. CSV Exports ──
+
+function escapeCSV(val) {
+  if (val === null || val === undefined) return '';
+  const s = String(val);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function toCSV(rows, columns) {
+  const header = columns.map(c => escapeCSV(c.label)).join(',');
+  const body = rows.map(row =>
+    columns.map(c => escapeCSV(row[c.key])).join(',')
+  ).join('\n');
+  return header + '\n' + body;
+}
+
+exports.exportSalesSummaryCSV = async (req, res, next) => {
+  try {
+    const { period = 'month' } = req.query;
+    const startDate = getStartDate(period);
+    const sales = await Sale.find({ createdAt: { $gte: startDate } }).sort({ createdAt: -1 }).lean();
+
+    const rows = sales.map(s => ({
+      date: s.createdAt ? s.createdAt.toISOString().split('T')[0] : '',
+      time: s.createdAt ? s.createdAt.toTimeString().split(' ')[0] : '',
+      id: s._id.toString(),
+      customer: s.customerName || '',
+      payment: s.paymentMethod || '',
+      items: s.items.reduce((sum, i) => sum + i.quantity, 0),
+      total: s.total || 0
+    }));
+
+    const columns = [
+      { key: 'date', label: 'Fecha' },
+      { key: 'time', label: 'Hora' },
+      { key: 'id', label: 'ID Venta' },
+      { key: 'customer', label: 'Cliente' },
+      { key: 'payment', label: 'Método Pago' },
+      { key: 'items', label: 'Items' },
+      { key: 'total', label: 'Total' }
+    ];
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=ventas-${period}-${new Date().toISOString().split('T')[0]}.csv`);
+    res.send('\uFEFF' + toCSV(rows, columns));
+  } catch (error) { next(error); }
+};
+
+exports.exportTopProductsCSV = async (req, res, next) => {
+  try {
+    const topProducts = await Sale.aggregate([
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.product',
+          name: { $first: '$items.productName' },
+          totalQuantity: { $sum: '$items.quantity' },
+          totalRevenue: { $sum: '$items.subtotal' }
+        }
+      },
+      { $sort: { totalQuantity: -1 } },
+      { $limit: 50 }
+    ]);
+
+    const columns = [
+      { key: 'name', label: 'Producto' },
+      { key: 'totalQuantity', label: 'Unidades Vendidas' },
+      { key: 'totalRevenue', label: 'Ingresos' }
+    ];
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=top-productos-${new Date().toISOString().split('T')[0]}.csv`);
+    res.send('\uFEFF' + toCSV(topProducts, columns));
+  } catch (error) { next(error); }
+};
+
+exports.exportInventoryCSV = async (req, res, next) => {
+  try {
+    const products = await Product.find({ isActive: true }).populate('category', 'name').lean();
+
+    const rows = products.map(p => ({
+      name: p.name,
+      category: p.category?.name || 'Sin categoría',
+      stock: p.stock,
+      minStock: p.minStock,
+      purchasePrice: p.purchasePrice,
+      salePrice: p.salePrice,
+      margin: p.salePrice - p.purchasePrice,
+      marginPct: p.purchasePrice > 0 ? (((p.salePrice - p.purchasePrice) / p.purchasePrice) * 100).toFixed(1) : 0,
+      stockValue: p.stock * p.purchasePrice,
+      saleValue: p.stock * p.salePrice,
+      status: p.stock === 0 ? 'AGOTADO' : p.stock <= p.minStock ? 'BAJO' : 'OK'
+    }));
+
+    const columns = [
+      { key: 'name', label: 'Producto' },
+      { key: 'category', label: 'Categoría' },
+      { key: 'stock', label: 'Stock' },
+      { key: 'minStock', label: 'Stock Mínimo' },
+      { key: 'purchasePrice', label: 'Precio Compra' },
+      { key: 'salePrice', label: 'Precio Venta' },
+      { key: 'margin', label: 'Margen' },
+      { key: 'marginPct', label: 'Margen %' },
+      { key: 'stockValue', label: 'Valor Inventario' },
+      { key: 'saleValue', label: 'Valor Venta Potencial' },
+      { key: 'status', label: 'Estado' }
+    ];
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=inventario-${new Date().toISOString().split('T')[0]}.csv`);
+    res.send('\uFEFF' + toCSV(rows, columns));
+  } catch (error) { next(error); }
 };

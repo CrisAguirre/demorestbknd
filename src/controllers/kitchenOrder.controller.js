@@ -1,6 +1,7 @@
 const KitchenOrder = require('../models/KitchenOrder');
 const PDFDocument = require('pdfkit');
 const path = require('path');
+const { emitKitchenEvent } = require('../services/socketService');
 
 exports.getPending = async (req, res, next) => {
   try {
@@ -46,6 +47,7 @@ exports.accept = async (req, res, next) => {
       timestamp: new Date()
     });
     await order.save();
+    emitKitchenEvent('kitchen:order:accepted', order);
     res.json(order);
   } catch (err) { next(err); }
 };
@@ -54,7 +56,7 @@ exports.deliver = async (req, res, next) => {
   try {
     const order = await KitchenOrder.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Pedido no encontrado' });
-    if (order.status !== 'en_preparacion') return res.status(400).json({ message: 'El pedido debe estar en preparación' });
+    if (order.status !== 'en_preparacion') return res.status(400).json({ message: 'El pedido debe estar en preparaci\u00f3n' });
 
     order.status = 'entregado';
     order.stateHistory.push({
@@ -64,6 +66,7 @@ exports.deliver = async (req, res, next) => {
       timestamp: new Date()
     });
     await order.save();
+    emitKitchenEvent('kitchen:order:delivered', order);
     res.json(order);
   } catch (err) { next(err); }
 };
@@ -82,6 +85,7 @@ exports.markPaid = async (req, res, next) => {
       timestamp: new Date()
     });
     await order.save();
+    emitKitchenEvent('kitchen:order:paid', order);
 
     const Table = require('../models/Table');
     if (order.tableNumber) {
@@ -93,7 +97,6 @@ exports.markPaid = async (req, res, next) => {
         await table.save();
       }
     }
-
     res.json(order);
   } catch (err) { next(err); }
 };
@@ -103,18 +106,13 @@ exports.printTicket = async (req, res, next) => {
     const order = await KitchenOrder.findById(req.params.id).populate('sale', 'createdAt');
     if (!order) return res.status(404).json({ message: 'Pedido no encontrado' });
 
-    const doc = new PDFDocument({
-      size: [80, 300],
-      margin: 5
-    });
+    const doc = new PDFDocument({ size: [80, 300], margin: 5 });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename=pedido-${order._id}.pdf`);
     doc.pipe(res);
 
-    const title = order.tableNumber
-      ? `MESA ${order.tableNumber}`
-      : 'DOMICILIO';
+    const title = order.tableNumber ? `MESA ${order.tableNumber}` : 'DOMICILIO';
     doc.fontSize(10).text(title, { align: 'center' });
     doc.moveDown(0.3);
     doc.fontSize(7).text(`# ${order._id.toString().slice(-6).toUpperCase()}`, { align: 'center' });
@@ -141,7 +139,6 @@ exports.printTicket = async (req, res, next) => {
 
     order.printCount += 1;
     await order.save();
-
     doc.end();
   } catch (err) { next(err); }
 };

@@ -9,6 +9,15 @@ const settingsSchema = new mongoose.Schema({
   theme: {
     primaryNeon: { type: String, default: '#D4AF37' },
     secondaryNeon: { type: String, default: '#8B5A2B' }
+  },
+  email: {
+    host: { type: String, default: '' },
+    port: { type: Number, default: 587 },
+    secure: { type: Boolean, default: false },
+    user: { type: String, default: '' },
+    pass: { type: String, default: '' },
+    from: { type: String, default: '' },
+    alertEmail: { type: String, default: '' }
   }
 }, { timestamps: true });
 

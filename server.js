@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -10,8 +11,8 @@ const connectDB = require('./src/config/db');
 const corsOptions = require('./src/config/cors');
 const { generalLimiter } = require('./src/middleware/rateLimiter');
 const errorHandler = require('./src/middleware/errorHandler');
+const socketService = require('./src/services/socketService');
 
-// Importar rutas
 const authRoutes = require('./src/routes/auth.routes');
 const productRoutes = require('./src/routes/product.routes');
 const categoryRoutes = require('./src/routes/category.routes');
@@ -32,16 +33,17 @@ const staffRoutes = require('./src/routes/staff.routes');
 const ticketbookRoutes = require('./src/routes/ticketbook.routes');
 const tableRoutes = require('./src/routes/table.routes');
 const kitchenOrderRoutes = require('./src/routes/kitchenOrder.routes');
+const deliveryRoutes = require('./src/routes/delivery.routes');
+
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 4000;
 
-// Crear carpeta uploads si no existe
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Middlewares globales
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(morgan('dev'));
@@ -49,10 +51,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(generalLimiter);
 
-// Archivos estáticos (logos subidos)
 app.use('/uploads', express.static(uploadsDir));
 
-// Rutas de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -73,17 +73,17 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/ticketbooks', ticketbookRoutes);
 app.use('/api/tables', tableRoutes);
 app.use('/api/kitchen-orders', kitchenOrderRoutes);
-// Ruta de health check
+app.use('/api/delivery', deliveryRoutes);
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), app: "La Soupe a l'Oignon API" });
 });
 
-// Manejo de errores global
 app.use(errorHandler);
 
-// Conectar a BD e iniciar servidor
 connectDB().then(() => {
-  app.listen(PORT, () => {
+  socketService.init(server);
+  server.listen(PORT, () => {
     console.log(`\n🏪 La Soupe a l'Oignon API corriendo en puerto ${PORT}`);
     console.log(`📡 Entorno: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔗 Health: http://localhost:${PORT}/api/health\n`);

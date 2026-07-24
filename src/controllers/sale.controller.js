@@ -5,6 +5,8 @@ const Ingredient = require('../models/Ingredient');
 const Alert = require('../models/Alert');
 const Table = require('../models/Table');
 const KitchenOrder = require('../models/KitchenOrder');
+const DeliveryOrder = require('../models/DeliveryOrder');
+const { emitKitchenEvent } = require('../services/socketService');
 
 exports.create = async (req, res, next) => {
   try {
@@ -81,7 +83,7 @@ exports.create = async (req, res, next) => {
               type: ing.stock === 0 ? 'sin_stock' : 'stock_bajo',
               message: ing.stock === 0
                 ? `"${ing.name}" se ha agotado (insumo para "${dish.name}")`
-                : `"${ing.name}" tiene stock bajo (${ing.stock}) — insumo para "${dish.name}"`,
+                : `"${ing.name}" tiene stock bajo (${ing.stock}) - insumo para "${dish.name}"`,
               priority: ing.stock === 0 ? 'alta' : 'media'
             });
           }
@@ -109,7 +111,7 @@ exports.create = async (req, res, next) => {
     }
 
     if (tableNumber) {
-      await KitchenOrder.create({
+      const ko = await KitchenOrder.create({
         sale: sale._id,
         tableNumber,
         items: saleItems.map(i => ({
@@ -123,6 +125,33 @@ exports.create = async (req, res, next) => {
           timestamp: new Date()
         }]
       });
+      emitKitchenEvent('kitchen:order:new', ko);
+    } else {
+      const delivery = await DeliveryOrder.create({
+        sale: sale._id,
+        customerName: customerName || 'Cliente general',
+        customerPhone: req.body.customerPhone || '',
+        customerAddress: req.body.customerAddress || 'Sin dirección',
+        deliveryFee: req.body.deliveryFee || 0,
+        items: saleItems.map(i => ({
+          productName: i.productName,
+          quantity: i.quantity
+        })),
+        status: 'pendiente',
+        stateHistory: [{ state: 'pendiente', timestamp: new Date() }]
+      });
+      emitKitchenEvent('delivery:new', delivery);
+      await KitchenOrder.create({
+        sale: sale._id,
+        items: saleItems.map(i => ({
+          product: i.product,
+          productName: i.productName,
+          quantity: i.quantity
+        })),
+        status: 'nuevo',
+        stateHistory: [{ state: 'nuevo', timestamp: new Date() }]
+      });
+      emitKitchenEvent('kitchen:order:new', delivery);
     }
 
     res.status(201).json(sale);

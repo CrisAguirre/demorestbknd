@@ -1,5 +1,6 @@
 const Alert = require('../models/Alert');
 const Product = require('../models/Product');
+const { sendAlertEmail, buildStockAlertHtml } = require('../services/emailService');
 
 exports.getAll = async (req, res, next) => {
   try {
@@ -64,6 +65,22 @@ exports.checkStockAlerts = async (req, res, next) => {
         });
         created++;
       }
+    }
+    if (created > 0) {
+      const newAlerts = await Alert.find({ read: false, type: { $in: ['stock_bajo', 'sin_stock'] } })
+        .populate('product', 'name stock minStock')
+        .sort({ createdAt: -1 })
+        .limit(created);
+      const Settings = require('../models/Settings');
+      const settings = await Settings.getSettings();
+      const enriched = newAlerts.map(a => ({
+        ...a.toObject(),
+        storeName: settings.storeName
+      }));
+      sendAlertEmail(
+        `⚠️ ${created} alerta(s) de stock - ${settings.storeName}`,
+        buildStockAlertHtml(enriched)
+      );
     }
     res.json({ message: `${created} alertas generadas`, total: lowStockProducts.length });
   } catch (error) {
