@@ -13,18 +13,23 @@ exports.nextBarcode = async (req, res, next) => {
     const category = await Category.findById(categoryId);
     const supplier = await Supplier.findById(supplierId);
 
-    if (!category || !category.code) return res.status(400).json({ message: 'Categoría inválida o sin código' });
-    if (!supplier || !supplier.code) return res.status(400).json({ message: 'Proveedor inválido o sin código' });
+    if (!category || !category.code || !supplier || !supplier.code) {
+      const last = await Product.findOne().sort({ barcode: -1 });
+      let nextNum = 1;
+      if (last && last.barcode) {
+        const numPart = parseInt(last.barcode.replace(/\D/g, ''), 10) || 0;
+        nextNum = numPart + 1;
+      }
+      return res.json({ barcode: `P${nextNum.toString().padStart(4, '0')}`, prefix: '' });
+    }
 
     const prefix = category.code + supplier.code;
-    // Find highest barcode with this exact prefix
     const last = await Product.findOne({ barcode: { $regex: `^${prefix}` } }).sort({ barcode: -1 });
     let nextNum = 1;
     if (last && last.barcode) {
       const suffix = last.barcode.substring(prefix.length);
       nextNum = parseInt(suffix, 10) + 1;
     }
-    // Code of product only has 3 digits as consecutive
     const barcode = prefix + nextNum.toString().padStart(3, '0');
     res.json({ barcode, prefix });
   } catch (error) {
