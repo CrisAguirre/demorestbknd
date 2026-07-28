@@ -2,6 +2,7 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Alert = require('../models/Alert');
 const Supplier = require('../models/Supplier');
+const { emitDataChange } = require('../services/socketService');
 
 exports.nextBarcode = async (req, res, next) => {
   try {
@@ -112,6 +113,7 @@ exports.getById = async (req, res, next) => {
 exports.create = async (req, res, next) => {
   try {
     const product = await Product.create(req.body);
+    try { emitDataChange('product', 'created', { id: product._id, name: product.name }); } catch {}
     res.status(201).json(product);
   } catch (error) {
     next(error);
@@ -124,6 +126,7 @@ exports.update = async (req, res, next) => {
       new: true, runValidators: true
     }).populate('category', 'name icon code').populate('supplier', 'name code');
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
+    try { emitDataChange('product', 'updated', { id: product._id, name: product.name }); } catch {}
     res.json(product);
   } catch (error) {
     next(error);
@@ -134,6 +137,7 @@ exports.remove = async (req, res, next) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
+    try { emitDataChange('product', 'deleted', { id: product._id, name: product.name }); } catch {}
     res.json({ message: 'Producto eliminado permanentemente' });
   } catch (error) {
     next(error);

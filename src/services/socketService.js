@@ -26,4 +26,9 @@ function emitKitchenEvent(event, data) {
   if (io) io.to('kitchen').emit(event, data);
 }
 
-module.exports = { init, getIO, emitKitchenEvent };
+/** Broadcast a data-change event to ALL connected clients */
+function emitDataChange(entity, action, data) {
+  if (io) io.emit('data:changed', { entity, action, data, timestamp: Date.now() });
+}
+
+module.exports = { init, getIO, emitKitchenEvent, emitDataChange };
