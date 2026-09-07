@@ -14,7 +14,7 @@ exports.getAll = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const { ingredients, ...dishData } = req.body;
+    const { ingredients } = req.body;
     if (ingredients && ingredients.length > 0) {
       for (const item of ingredients) {
         const ing = await Ingredient.findById(item.ingredient);
@@ -33,7 +33,7 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
   try {
-    const { ingredients, ...dishData } = req.body;
+    const { ingredients } = req.body;
     if (ingredients && ingredients.length > 0) {
       for (const item of ingredients) {
         const ing = await Ingredient.findById(item.ingredient);
@@ -66,9 +66,7 @@ exports.getRecipeCost = async (req, res, next) => {
   try {
     const dish = await Dish.findById(req.params.id).populate('ingredients.ingredient');
     if (!dish) return res.status(404).json({ message: 'Plato no encontrado' });
-    const recipeCost = dish.ingredients.reduce((sum, item) => {
-      return sum + (item.ingredient?.cost || 0) * item.quantity;
-    }, 0);
+    const recipeCost = dish.ingredients.reduce((sum, item) => sum + (item.ingredient?.cost || 0) * item.quantity, 0);
     const margin = dish.price > 0 ? ((dish.price - recipeCost) / dish.price * 100).toFixed(1) : 0;
     res.json({
       dishId: dish._id,
@@ -97,17 +95,17 @@ exports.checkAvailability = async (req, res, next) => {
     const missing = [];
     for (const item of dish.ingredients) {
       const ing = item.ingredient;
-      if (!ing) {
+      if (ing) {
+        if (ing.stock < item.quantity) {
+          missing.push({
+            ingredient: ing.name,
+            required: item.quantity,
+            available: ing.stock,
+            deficit: Math.round((item.quantity - ing.stock) * 100) / 100
+          });
+        }
+      } else {
         missing.push({ ingredient: 'Eliminado', quantity: item.quantity, available: 0 });
-        continue;
-      }
-      if (ing.stock < item.quantity) {
-        missing.push({
-          ingredient: ing.name,
-          required: item.quantity,
-          available: ing.stock,
-          deficit: Math.round((item.quantity - ing.stock) * 100) / 100
-        });
       }
     }
 
@@ -136,17 +134,17 @@ exports.batchCheckAvailability = async (req, res, next) => {
       const missing = [];
       for (const item of dish.ingredients) {
         const ing = item.ingredient;
-        if (!ing) {
+        if (ing) {
+          if (ing.stock < item.quantity) {
+            missing.push({
+              ingredient: ing.name,
+              required: item.quantity,
+              available: ing.stock,
+              deficit: Math.round((item.quantity - ing.stock) * 100) / 100
+            });
+          }
+        } else {
           missing.push({ ingredient: 'Eliminado', quantity: item.quantity, available: 0 });
-          continue;
-        }
-        if (ing.stock < item.quantity) {
-          missing.push({
-            ingredient: ing.name,
-            required: item.quantity,
-            available: ing.stock,
-            deficit: Math.round((item.quantity - ing.stock) * 100) / 100
-          });
         }
       }
       results.push({
@@ -174,7 +172,20 @@ exports.getAvailabilitySummary = async (req, res, next) => {
 
       for (const item of dish.ingredients) {
         const ing = item.ingredient;
-        if (!ing) {
+        if (ing) {
+          const maxForThisIngredient = ing.stock / item.quantity;
+          if (maxForThisIngredient < minPortions) {
+            minPortions = maxForThisIngredient;
+          }
+
+          ingredientDetails.push({
+            name: ing.name,
+            required: item.quantity,
+            available: ing.stock,
+            unit: ing.unit,
+            maxPortions: Math.floor(maxForThisIngredient)
+          });
+        } else {
           ingredientDetails.push({
             name: 'Eliminado',
             required: item.quantity,
@@ -182,27 +193,11 @@ exports.getAvailabilitySummary = async (req, res, next) => {
             unit: 'unidades',
             maxPortions: 0
           });
-          continue;
         }
-
-        const maxForThisIngredient = ing.stock / item.quantity;
-        if (maxForThisIngredient < minPortions) {
-          minPortions = maxForThisIngredient;
-        }
-
-        ingredientDetails.push({
-          name: ing.name,
-          required: item.quantity,
-          available: ing.stock,
-          unit: ing.unit,
-          maxPortions: Math.floor(maxForThisIngredient)
-        });
       }
 
       const maxPortions = minPortions === Infinity ? 0 : Math.floor(minPortions);
-      const recipeCost = dish.ingredients.reduce((sum, item) => {
-        return sum + (item.ingredient?.cost || 0) * item.quantity;
-      }, 0);
+      const recipeCost = dish.ingredients.reduce((sum, item) => sum + (item.ingredient?.cost || 0) * item.quantity, 0);
       const margin = dish.price > 0 ? ((dish.price - recipeCost) / dish.price * 100).toFixed(1) : 0;
 
       results.push({
@@ -236,7 +231,20 @@ exports.getAvailabilityById = async (req, res, next) => {
 
     for (const item of dish.ingredients) {
       const ing = item.ingredient;
-      if (!ing) {
+      if (ing) {
+        const maxForThisIngredient = ing.stock / item.quantity;
+        if (maxForThisIngredient < minPortions) {
+          minPortions = maxForThisIngredient;
+        }
+
+        ingredientDetails.push({
+          name: ing.name,
+          required: item.quantity,
+          available: ing.stock,
+          unit: ing.unit,
+          maxPortions: Math.floor(maxForThisIngredient)
+        });
+      } else {
         ingredientDetails.push({
           name: 'Eliminado',
           required: item.quantity,
@@ -246,21 +254,7 @@ exports.getAvailabilityById = async (req, res, next) => {
         });
         missing.push({ ingredient: 'Eliminado', required: item.quantity, available: 0 });
         minPortions = 0;
-        continue;
       }
-
-      const maxForThisIngredient = ing.stock / item.quantity;
-      if (maxForThisIngredient < minPortions) {
-        minPortions = maxForThisIngredient;
-      }
-
-      ingredientDetails.push({
-        name: ing.name,
-        required: item.quantity,
-        available: ing.stock,
-        unit: ing.unit,
-        maxPortions: Math.floor(maxForThisIngredient)
-      });
 
       if (ing.stock < item.quantity) {
         missing.push({
@@ -273,9 +267,7 @@ exports.getAvailabilityById = async (req, res, next) => {
     }
 
     const maxPortions = minPortions === Infinity ? 0 : Math.floor(minPortions);
-    const recipeCost = dish.ingredients.reduce((sum, item) => {
-      return sum + (item.ingredient?.cost || 0) * item.quantity;
-    }, 0);
+    const recipeCost = dish.ingredients.reduce((sum, item) => sum + (item.ingredient?.cost || 0) * item.quantity, 0);
     const margin = dish.price > 0 ? ((dish.price - recipeCost) / dish.price * 100).toFixed(1) : 0;
 
     res.json({

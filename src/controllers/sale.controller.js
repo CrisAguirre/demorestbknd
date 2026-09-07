@@ -2,32 +2,11 @@ const mongoose = require('mongoose');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Dish = require('../models/Dish');
-const Ingredient = require('../models/Ingredient');
 const Alert = require('../models/Alert');
 const Table = require('../models/Table');
 const KitchenOrder = require('../models/KitchenOrder');
 const DeliveryOrder = require('../models/DeliveryOrder');
 const { emitKitchenEvent } = require('../services/socketService');
-
-async function createAlertIfNeeded(document, type, documentType, saleRef) {
-  if (document.stock === 0) {
-    await Alert.create({
-      [documentType]: document._id,
-      type: 'sin_stock',
-      message: `"${document.name}" se ha agotado`,
-      priority: 'alta'
-    });
-  } else if (document.stock <= document.minStock) {
-    await Alert.create({
-      [documentType]: document._id,
-      type: 'stock_bajo',
-      message: type === 'product'
-        ? `"${document.name}" tiene stock bajo (${document.stock} unidades)`
-        : `"${document.name}" tiene stock bajo (${document.stock}) - insumo para "${saleRef}"`,
-      priority: 'media'
-    });
-  }
-}
 
 async function recordMovement(document, type, quantity, previousStock, newStock, userId, reference, referenceModel, description) {
   document.movementHistory.push({
@@ -116,54 +95,56 @@ exports.create = async (req, res, next) => {
         const ingredientsConsumed = [];
         for (const recipeItem of dish.ingredients) {
           const ing = recipeItem.ingredient;
-          if (!ing) continue;
-          const needed = recipeItem.quantity * item.quantity;
-          if (ing.stock < needed) {
-            await session.abortTransaction();
-            return res.status(400).json({
-              message: `Stock insuficiente de "${ing.name}" para "${dish.name}" (necesario: ${needed}, disponible: ${ing.stock})`
-            });
+          if (ing) {
+            const needed = recipeItem.quantity * item.quantity;
+            if (ing.stock < needed) {
+              await session.abortTransaction();
+              return res.status(400).json({
+                message: `Stock insuficiente de "${ing.name}" para "${dish.name}" (necesario: ${needed}, disponible: ${ing.stock})`
+              });
+            }
           }
         }
 
         const subtotal = dish.price * item.quantity;
         for (const recipeItem of dish.ingredients) {
           const ing = recipeItem.ingredient;
-          if (!ing) continue;
-          const needed = recipeItem.quantity * item.quantity;
-          const previousStock = ing.stock;
-          ing.stock -= needed;
-          await ing.save({ session });
+          if (ing) {
+            const needed = recipeItem.quantity * item.quantity;
+            const previousStock = ing.stock;
+            ing.stock -= needed;
+            await ing.save({ session });
 
-          await recordMovement(
-            ing,
-            'sale',
-            needed,
-            previousStock,
-            ing.stock,
-            req.user._id,
-            null,
-            'Sale',
-            `Consumo para "${dish.name}" x${item.quantity}`
-          );
-          await ing.save({ session });
+            await recordMovement(
+              ing,
+              'sale',
+              needed,
+              previousStock,
+              ing.stock,
+              req.user._id,
+              null,
+              'Sale',
+              `Consumo para "${dish.name}" x${item.quantity}`
+            );
+            await ing.save({ session });
 
-          ingredientsConsumed.push({
-            ingredient: ing._id,
-            ingredientName: ing.name,
-            quantity: needed,
-            unit: ing.unit
-          });
-
-          if (ing.stock <= ing.minStock) {
-            alertsToCreate.push({
+            ingredientsConsumed.push({
               ingredient: ing._id,
-              type: ing.stock === 0 ? 'sin_stock' : 'stock_bajo',
-              message: ing.stock === 0
-                ? `"${ing.name}" se ha agotado (insumo para "${dish.name}")`
-                : `"${ing.name}" tiene stock bajo (${ing.stock}) - insumo para "${dish.name}"`,
-              priority: ing.stock === 0 ? 'alta' : 'media'
+              ingredientName: ing.name,
+              quantity: needed,
+              unit: ing.unit
             });
+
+            if (ing.stock <= ing.minStock) {
+              alertsToCreate.push({
+                ingredient: ing._id,
+                type: ing.stock === 0 ? 'sin_stock' : 'stock_bajo',
+                message: ing.stock === 0
+                  ? `"${ing.name}" se ha agotado (insumo para "${dish.name}")`
+                  : `"${ing.name}" tiene stock bajo (${ing.stock}) - insumo para "${dish.name}"`,
+                priority: ing.stock === 0 ? 'alta' : 'media'
+              });
+            }
           }
         }
 
@@ -265,7 +246,7 @@ exports.getAll = async (req, res, next) => {
     if (startDate || endDate) {
       filter.createdAt = {};
       if (startDate) filter.createdAt.$gte = new Date(startDate);
-      if (endDate) filter.createdAt.$lte = new Date(endDate + 'T23:59:59.999Z');
+      if (endDate) filter.createdAt.$lte = new Date(`${endDate}T23:59:59.999Z`);
     }
 
     const sales = await Sale.find(filter)

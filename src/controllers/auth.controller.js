@@ -63,7 +63,7 @@ exports.registerClient = async (req, res, next) => {
     const user = await User.create({
       name, email, phone, address, passwordHash: password, role: 'cliente'
     });
-    
+
     const tokens = generateTokens(user._id);
     res.status(201).json({ message: 'Registro exitoso', user: user.toJSON(), ...tokens });
   } catch (error) {
@@ -71,8 +71,7 @@ exports.registerClient = async (req, res, next) => {
   }
 };
 
-
-exports.refreshToken = async (req, res, next) => {
+exports.refreshToken = async (req, res, _next) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {
@@ -101,11 +100,11 @@ exports.updateProfile = async (req, res, next) => {
     const { name, phone, address } = req.body;
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
-    
+
     if (name) user.name = name;
     if (phone) user.phone = phone;
     if (address) user.address = address;
-    
+
     await user.save();
     res.json({ message: 'Perfil actualizado', user: user.toJSON() });
   } catch (error) {

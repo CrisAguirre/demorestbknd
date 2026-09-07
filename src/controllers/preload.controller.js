@@ -8,17 +8,17 @@
  * frontend cache can transparently serve the data to every component.
  */
 
-const Sale     = require('../models/Sale');
-const Product  = require('../models/Product');
+const Sale = require('../models/Sale');
+const Product = require('../models/Product');
 const Category = require('../models/Category');
-const Alert    = require('../models/Alert');
+const Alert = require('../models/Alert');
 const CashClosing = require('../models/CashClosing');
 const Settings = require('../models/Settings');
 
 // ── helpers (replicated from report.controller to avoid circular deps) ──────
 function getStartDate(period) {
   const now = new Date();
-  if (period === 'day')  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === 'day') return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (period === 'week') return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
@@ -40,10 +40,10 @@ async function buildSalesSummary(period) {
     ])
   ]);
 
-  const totalRevenue      = sales.reduce((s, x) => s + x.total, 0);
+  const totalRevenue = sales.reduce((s, x) => s + x.total, 0);
   const totalTransactions = sales.length;
-  const averageTicket     = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
-  const totalItems        = sales.reduce((s, x) => s + x.items.reduce((is, i) => is + i.quantity, 0), 0);
+  const averageTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+  const totalItems = sales.reduce((s, x) => s + x.items.reduce((is, i) => is + i.quantity, 0), 0);
 
   return { totalRevenue, totalTransactions, averageTicket, salesByDay, totalItems, period };
 }
@@ -84,10 +84,10 @@ exports.preload = async (req, res, next) => {
       // 3. ALL active products for POS + Inventory local search
       (async () => {
         const products = await Product.find({ isActive: true })
-            .populate('category', 'name icon code')
-            .populate('supplier', 'name code')
-            .sort({ name: 1 })
-            .lean();
+          .populate('category', 'name icon code')
+          .populate('supplier', 'name code')
+          .sort({ name: 1 })
+          .lean();
         return { products, total: products.length };
       })(),
 
@@ -119,7 +119,7 @@ exports.preload = async (req, res, next) => {
             _id: '$items.product',
             name: { $first: '$items.productName' },
             totalQuantity: { $sum: '$items.quantity' },
-            totalRevenue:  { $sum: '$items.subtotal' }
+            totalRevenue: { $sum: '$items.subtotal' }
           }
         },
         { $sort: { totalQuantity: -1 } },
@@ -134,7 +134,7 @@ exports.preload = async (req, res, next) => {
       settings,
       categories,
       products: productsResult,
-      alerts:   alertsResult,
+      alerts: alertsResult,
       salesDay,
       salesWeek,
       topProducts,

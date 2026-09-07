@@ -27,7 +27,7 @@ exports.getAll = async (req, res, next) => {
     if (from || to) {
       filter.date = {};
       if (from) filter.date.$gte = new Date(from);
-      if (to)   filter.date.$lte = new Date(to + 'T23:59:59');
+      if (to) filter.date.$lte = new Date(`${to}T23:59:59`);
     }
 
     const [expenses, total] = await Promise.all([

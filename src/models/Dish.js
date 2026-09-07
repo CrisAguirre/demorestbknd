@@ -23,9 +23,7 @@ dishSchema.index({ name: 'text' });
 dishSchema.index({ isAvailable: 1, category: 1 });
 
 dishSchema.virtual('recipeCost').get(function () {
-  return this.ingredients.reduce((sum, item) => {
-    return sum + (item.ingredient?.cost || 0) * item.quantity;
-  }, 0);
+  return this.ingredients.reduce((sum, item) => sum + (item.ingredient?.cost || 0) * item.quantity, 0);
 });
 
 dishSchema.set('toJSON', { virtuals: true });

@@ -1,6 +1,5 @@
-const KitchenOrder = require('../models/KitchenOrder');
 const PDFDocument = require('pdfkit');
-const path = require('path');
+const KitchenOrder = require('../models/KitchenOrder');
 const { emitKitchenEvent } = require('../services/socketService');
 
 exports.getPending = async (req, res, next) => {
@@ -127,7 +126,7 @@ exports.printTicket = async (req, res, next) => {
     doc.fontSize(6);
 
     for (const item of order.items) {
-      const y = doc.y;
+      const { y } = doc;
       doc.text(String(item.quantity), 5, y, { width: 25 });
       doc.text(item.productName, 30, y, { width: 45 });
       if (item.notes) {

@@ -9,9 +9,9 @@ function init(server) {
   });
 
   io.on('connection', (socket) => {
-    console.log('Cliente conectado: ' + socket.id);
+    console.log(`Cliente conectado: ${socket.id}`);
     socket.on('join:kitchen', () => socket.join('kitchen'));
-    socket.on('disconnect', () => console.log('Cliente desconectado: ' + socket.id));
+    socket.on('disconnect', () => console.log(`Cliente desconectado: ${socket.id}`));
   });
 
   console.log('Socket.io inicializado');

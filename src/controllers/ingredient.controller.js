@@ -82,7 +82,7 @@ exports.restock = async (req, res, next) => {
     );
 
     res.json({
-      ingredient: ingredient,
+      ingredient,
       previousStock,
       added: quantity,
       newStock: ingredient.stock
@@ -122,7 +122,7 @@ exports.adjustStock = async (req, res, next) => {
     }
 
     res.json({
-      ingredient: ingredient,
+      ingredient,
       previousStock,
       newStock: ingredient.stock,
       difference

@@ -1,5 +1,4 @@
 const Settings = require('../models/Settings');
-const path = require('path');
 
 exports.get = async (req, res, next) => {
   try {
@@ -14,7 +13,7 @@ exports.update = async (req, res, next) => {
   try {
     const settings = await Settings.getSettings();
     const { storeName, phone, address, whatsappNumber, theme } = req.body;
-    let email = req.body.email;
+    let { email } = req.body;
     if (typeof email === 'string') {
       try { email = JSON.parse(email); } catch { email = undefined; }
     }

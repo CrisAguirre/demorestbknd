@@ -34,14 +34,14 @@ exports.consume = async (req, res, next) => {
   try {
     const ticketBook = await TicketBook.findById(req.params.id);
     if (!ticketBook) return res.status(404).json({ message: 'Tiquetera no encontrada' });
-    
+
     if (ticketBook.consumedMeals >= ticketBook.totalMeals) {
       return res.status(400).json({ message: 'Tiquetera agotada' });
     }
 
     ticketBook.consumedMeals += 1;
     ticketBook.consumptions.push({ date: new Date(), notes: req.body.notes || '' });
-    
+
     if (ticketBook.consumedMeals >= ticketBook.totalMeals) {
       ticketBook.isActive = false; // Agotada
     }

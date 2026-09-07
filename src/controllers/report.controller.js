@@ -1,6 +1,5 @@
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
-const Category = require('../models/Category');
 const KitchenOrder = require('../models/KitchenOrder');
 
 // Helper: build start date from period
@@ -198,10 +197,10 @@ exports.salesByHour = async (req, res, next) => {
 exports.inventoryValuation = async (req, res, next) => {
   try {
     const products = await Product.find({ isActive: true }).populate('category', 'name');
-    
+
     let totalCostValue = 0;
     let totalSaleValue = 0;
-    let totalProducts = products.length;
+    const totalProducts = products.length;
     let totalUnits = 0;
     let lowStockCount = 0;
     let outOfStockCount = 0;
@@ -249,7 +248,7 @@ exports.inventoryValuation = async (req, res, next) => {
 exports.profitMargins = async (req, res, next) => {
   try {
     const products = await Product.find({ isActive: true }).select('name purchasePrice salePrice stock category').populate('category', 'name');
-    
+
     const margins = products.map(p => {
       const margin = p.salePrice - p.purchasePrice;
       const marginPercent = p.purchasePrice > 0 ? ((margin / p.purchasePrice) * 100).toFixed(1) : 0;
@@ -348,10 +347,8 @@ function escapeCSV(val) {
 
 function toCSV(rows, columns) {
   const header = columns.map(c => escapeCSV(c.label)).join(',');
-  const body = rows.map(row =>
-    columns.map(c => escapeCSV(row[c.key])).join(',')
-  ).join('\n');
-  return header + '\n' + body;
+  const body = rows.map(row => columns.map(c => escapeCSV(row[c.key])).join(',')).join('\n');
+  return `${header}\n${body}`;
 }
 
 exports.exportSalesSummaryCSV = async (req, res, next) => {
@@ -382,7 +379,7 @@ exports.exportSalesSummaryCSV = async (req, res, next) => {
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=ventas-${period}-${new Date().toISOString().split('T')[0]}.csv`);
-    res.send('\uFEFF' + toCSV(rows, columns));
+    res.send(`\uFEFF${toCSV(rows, columns)}`);
   } catch (error) { next(error); }
 };
 
@@ -410,7 +407,7 @@ exports.exportTopProductsCSV = async (req, res, next) => {
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=top-productos-${new Date().toISOString().split('T')[0]}.csv`);
-    res.send('\uFEFF' + toCSV(topProducts, columns));
+    res.send(`\uFEFF${toCSV(topProducts, columns)}`);
   } catch (error) { next(error); }
 };
 
@@ -448,6 +445,6 @@ exports.exportInventoryCSV = async (req, res, next) => {
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=inventario-${new Date().toISOString().split('T')[0]}.csv`);
-    res.send('\uFEFF' + toCSV(rows, columns));
+    res.send(`\uFEFF${toCSV(rows, columns)}`);
   } catch (error) { next(error); }
 };

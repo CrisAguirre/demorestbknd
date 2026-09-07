@@ -163,6 +163,29 @@ async function createTestCashClosing(overrides = {}) {
   });
 }
 
+async function createTestPurchaseIngredient(overrides = {}) {
+  const PurchaseIngredient = require('../src/models/PurchaseIngredient');
+  const user = overrides.user || await createTestUser();
+  const supplier = overrides.supplier || await createTestSupplier();
+  const ingredient = overrides.ingredient || await createTestIngredient({ stock: 0 });
+  return await PurchaseIngredient.create({
+    supplier: supplier._id,
+    supplierName: supplier.name,
+    user: user._id,
+    items: [{
+      ingredient: ingredient._id,
+      ingredientName: ingredient.name,
+      quantity: 10,
+      unitCost: ingredient.cost,
+      unit: ingredient.unit,
+      subtotal: ingredient.cost * 10
+    }],
+    total: ingredient.cost * 10,
+    status: 'recibida',
+    ...overrides
+  });
+}
+
 module.exports = {
   connectDB,
   closeDB,
@@ -177,5 +200,6 @@ module.exports = {
   createTestDish,
   createTestTable,
   createTestKitchenOrder,
-  createTestCashClosing
+  createTestCashClosing,
+  createTestPurchaseIngredient
 };

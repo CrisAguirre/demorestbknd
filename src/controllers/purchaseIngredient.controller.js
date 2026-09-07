@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const PurchaseIngredient = require('../models/PurchaseIngredient');
 const Ingredient = require('../models/Ingredient');
-const Supplier = require('../models/Supplier');
 
 async function recordMovement(document, type, quantity, previousStock, newStock, userId, reference, referenceModel, description) {
   document.movementHistory.push({
@@ -100,7 +99,7 @@ exports.getAll = async (req, res, next) => {
     if (startDate || endDate) {
       filter.createdAt = {};
       if (startDate) filter.createdAt.$gte = new Date(startDate);
-      if (endDate) filter.createdAt.$lte = new Date(endDate + 'T23:59:59.999Z');
+      if (endDate) filter.createdAt.$lte = new Date(`${endDate}T23:59:59.999Z`);
     }
     if (status) filter.status = status;
 

@@ -15,8 +15,8 @@ const productSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 productSchema.index({ name: 'text', barcode: 'text' });
-productSchema.index({ isActive: 1, name: 1 });          // list active sorted
-productSchema.index({ isActive: 1, category: 1 });      // filter by category
-productSchema.index({ isActive: 1, supplier: 1 });      // filter by supplier
+productSchema.index({ isActive: 1, name: 1 }); // list active sorted
+productSchema.index({ isActive: 1, category: 1 }); // filter by category
+productSchema.index({ isActive: 1, supplier: 1 }); // filter by supplier
 
 module.exports = mongoose.model('Product', productSchema);

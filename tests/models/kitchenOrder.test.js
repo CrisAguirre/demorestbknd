@@ -9,7 +9,7 @@ beforeEach(async () => { await clearDB(); });
 describe('KitchenOrder Model', () => {
   const validData = () => ({
     sale: new mongoose.Types.ObjectId(),
-    items: [{ product: new mongoose.Types.ObjectId(), productName: 'Test Item', quantity: 2 }],
+    items: [{ product: new mongoose.Types.ObjectId(), productType: 'Product', productName: 'Test Item', quantity: 2 }],
     status: 'nuevo',
     stateHistory: [{ state: 'nuevo', timestamp: new Date() }]
   });
@@ -20,13 +20,28 @@ describe('KitchenOrder Model', () => {
     expect(order.status).toBe('nuevo');
     expect(order.items).toHaveLength(1);
     expect(order.items[0].productName).toBe('Test Item');
+    expect(order.items[0].productType).toBe('Product');
     expect(order.printCount).toBe(0);
+  });
+
+  it('should create KitchenOrder with Dish items', async () => {
+    const dishId = new mongoose.Types.ObjectId();
+    const order = await KitchenOrder.create({
+      sale: new mongoose.Types.ObjectId(),
+      items: [
+        { product: dishId, productType: 'Dish', productName: 'Sopa especial', quantity: 3 }
+      ],
+      status: 'nuevo',
+      stateHistory: [{ state: 'nuevo', timestamp: new Date() }]
+    });
+    expect(order.items[0].productType).toBe('Dish');
+    expect(order.items[0].product.toString()).toBe(dishId.toString());
   });
 
   it('should default status to nuevo', async () => {
     const order = await KitchenOrder.create({
       sale: new mongoose.Types.ObjectId(),
-      items: [{ product: new mongoose.Types.ObjectId(), productName: 'X', quantity: 1 }],
+      items: [{ product: new mongoose.Types.ObjectId(), productType: 'Product', productName: 'X', quantity: 1 }],
       stateHistory: [{ state: 'nuevo', timestamp: new Date() }]
     });
     expect(order.status).toBe('nuevo');
@@ -46,7 +61,7 @@ describe('KitchenOrder Model', () => {
   });
 
   it('should require sale field', async () => {
-    const promise = KitchenOrder.create({ items: [{ product: new mongoose.Types.ObjectId(), productName: 'X', quantity: 1 }] });
+    const promise = KitchenOrder.create({ items: [{ product: new mongoose.Types.ObjectId(), productType: 'Product', productName: 'X', quantity: 1 }] });
     await expect(promise).rejects.toThrow();
   });
 
@@ -58,7 +73,7 @@ describe('KitchenOrder Model', () => {
   it('should reject items with quantity < 1', async () => {
     const promise = KitchenOrder.create({
       sale: new mongoose.Types.ObjectId(),
-      items: [{ product: new mongoose.Types.ObjectId(), productName: 'X', quantity: 0 }],
+      items: [{ product: new mongoose.Types.ObjectId(), productType: 'Product', productName: 'X', quantity: 0 }],
       stateHistory: [{ state: 'nuevo', timestamp: new Date() }]
     });
     await expect(promise).rejects.toThrow();
@@ -74,7 +89,7 @@ describe('KitchenOrder Model', () => {
   it('should allow multiple stateHistory entries', async () => {
     const order = await KitchenOrder.create({
       sale: new mongoose.Types.ObjectId(),
-      items: [{ product: new mongoose.Types.ObjectId(), productName: 'X', quantity: 1 }],
+      items: [{ product: new mongoose.Types.ObjectId(), productType: 'Product', productName: 'X', quantity: 1 }],
       status: 'entregado',
       stateHistory: [
         { state: 'nuevo', timestamp: new Date(Date.now() - 60000) },

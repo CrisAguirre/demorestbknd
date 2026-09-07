@@ -81,4 +81,55 @@ describe('Dish Controller', () => {
     expect(res.body).toHaveLength(2);
     expect(res.body[0].available).toBe(true);
   });
+
+  it('should return availability summary with maxPortions', async () => {
+    const ing1 = await Ingredient.create({ name: 'Cebolla', unit: 'kilos', stock: 20, minStock: 5, cost: 3000 });
+    const ing2 = await Ingredient.create({ name: 'Queso', unit: 'kilos', stock: 10, minStock: 3, cost: 8000 });
+    const dish = await Dish.create({ name: 'Sopa a la cebolla', category: 'Sopas', price: 15000, ingredients: [{ ingredient: ing1._id, quantity: 2 }, { ingredient: ing2._id, quantity: 0.5 }] });
+
+    const res = await request(app).get('/api/dishes/availability/summary').set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.dishes).toHaveLength(1);
+    expect(res.body.dishes[0].maxPortions).toBe(20);
+    expect(res.body.dishes[0].available).toBe(true);
+    expect(res.body.dishes[0].ingredients).toHaveLength(2);
+    expect(res.body.dishes[0].margin).toBe(73.33);
+  });
+
+  it('should calculate maxPortions as limiting ingredient', async () => {
+    const ing1 = await Ingredient.create({ name: 'Agua', unit: 'litros', stock: 100, minStock: 10, cost: 500 });
+    const ing2 = await Ingredient.create({ name: 'Sal', unit: 'gramos', stock: 5, minStock: 1, cost: 200 });
+    const dish = await Dish.create({ name: 'Agua hervida', category: 'Bebidas', price: 3000, ingredients: [{ ingredient: ing1._id, quantity: 10 }, { ingredient: ing2._id, quantity: 1 }] });
+
+    const res = await request(app).get('/api/dishes/availability/summary').set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.dishes[0].maxPortions).toBe(5);
+  });
+
+  it('should get availability by id with full details', async () => {
+    const ing1 = await Ingredient.create({ name: 'Pollo', unit: 'kilos', stock: 15, minStock: 5, cost: 12000 });
+    const dish = await Dish.create({ name: 'Pollo braseado', category: 'Platos fuertes', price: 35000, ingredients: [{ ingredient: ing1._id, quantity: 1 }] });
+
+    const res = await request(app).get(`/api/dishes/${dish._id}/availability-summary`).set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.maxPortions).toBe(15);
+    expect(res.body.available).toBe(true);
+    expect(res.body.ingredients).toHaveLength(1);
+    expect(res.body.recipeCost).toBe(12000);
+    expect(res.body.margin).toBe(65.71);
+  });
+
+  it('should include deficit in batch availability check', async () => {
+    const lowIng = await Ingredient.create({ name: 'Carne', unit: 'kilos', stock: 3, minStock: 5, cost: 15000 });
+    const dish = await Dish.create({ name: 'Bife', category: 'Platos fuertes', price: 45000, ingredients: [{ ingredient: lowIng._id, quantity: 2 }] });
+
+    const res = await request(app).post('/api/dishes/batch-availability').set('Authorization', `Bearer ${adminToken}`).send({ dishIds: [dish._id] });
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].available).toBe(false);
+    expect(res.body[0].missing[0].deficit).toBe(1);
+  });
 });

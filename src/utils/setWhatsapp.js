@@ -1,5 +1,4 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
 const Settings = require('../models/Settings');
 const connectDB = require('../config/db');
 

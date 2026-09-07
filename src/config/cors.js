@@ -1,5 +1,5 @@
 const corsOptions = {
-  origin: function (origin, callback) {
+  origin(origin, callback) {
     const allowedOrigins = [
       process.env.FRONTEND_URL,
       'http://localhost:4200',

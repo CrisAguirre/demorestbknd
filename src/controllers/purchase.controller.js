@@ -1,5 +1,5 @@
 const Purchase = require('../models/Purchase');
-const Product  = require('../models/Product');
+const Product = require('../models/Product');
 const Supplier = require('../models/Supplier');
 
 // GET /api/purchases  (paginado)
@@ -8,11 +8,11 @@ exports.getAll = async (req, res, next) => {
     const { page = 1, limit = 20, supplier, status, from, to } = req.query;
     const filter = {};
     if (supplier) filter.supplier = supplier;
-    if (status)   filter.status = status;
+    if (status) filter.status = status;
     if (from || to) {
       filter.createdAt = {};
       if (from) filter.createdAt.$gte = new Date(from);
-      if (to)   filter.createdAt.$lte = new Date(to + 'T23:59:59');
+      if (to) filter.createdAt.$lte = new Date(`${to}T23:59:59`);
     }
 
     const [purchases, total] = await Promise.all([

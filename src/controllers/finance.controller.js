@@ -1,13 +1,13 @@
-const Sale     = require('../models/Sale');
+const Sale = require('../models/Sale');
 const Purchase = require('../models/Purchase');
-const Expense  = require('../models/Expense');
-const Product  = require('../models/Product');
+const Expense = require('../models/Expense');
+const Product = require('../models/Product');
 
 function getRange(period) {
   const now = new Date();
-  if (period === 'day')   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (period === 'week')  return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  if (period === 'year')  return new Date(now.getFullYear(), 0, 1);
+  if (period === 'day') return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === 'week') return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  if (period === 'year') return new Date(now.getFullYear(), 0, 1);
   // month (default)
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
@@ -25,12 +25,10 @@ exports.financialSummary = async (req, res, next) => {
 
     // Costo de ventas (COGS) = suma de (qty × purchasePrice) por ítem vendido
     const productIds = [...new Set(sales.flatMap(s => s.items.map(i => i.product?.toString())))];
-    const products   = await Product.find({ _id: { $in: productIds } }).select('purchasePrice');
-    const costMap    = Object.fromEntries(products.map(p => [p._id.toString(), p.purchasePrice]));
+    const products = await Product.find({ _id: { $in: productIds } }).select('purchasePrice');
+    const costMap = Object.fromEntries(products.map(p => [p._id.toString(), p.purchasePrice]));
 
-    const cogs = sales.reduce((acc, sale) =>
-      acc + sale.items.reduce((ia, item) =>
-        ia + item.quantity * (costMap[item.product?.toString()] ?? item.unitPrice), 0), 0);
+    const cogs = sales.reduce((acc, sale) => acc + sale.items.reduce((ia, item) => ia + item.quantity * (costMap[item.product?.toString()] ?? item.unitPrice), 0), 0);
 
     // Compras a proveedores
     const purchases = await Purchase.find({
@@ -51,11 +49,11 @@ exports.financialSummary = async (req, res, next) => {
     });
 
     // KPIs contables
-    const grossProfit     = totalRevenue - cogs;
-    const grossMargin     = totalRevenue > 0 ? (grossProfit / totalRevenue * 100).toFixed(1) : 0;
+    const grossProfit = totalRevenue - cogs;
+    const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue * 100).toFixed(1) : 0;
     const operatingProfit = grossProfit - totalExpenses;
-    const netProfit       = operatingProfit;                 // sin impuestos modelados por ahora
-    const netMargin       = totalRevenue > 0 ? (netProfit / totalRevenue * 100).toFixed(1) : 0;
+    const netProfit = operatingProfit; // sin impuestos modelados por ahora
+    const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue * 100).toFixed(1) : 0;
 
     // Tendencia diaria de ingresos, compras y gastos
     const dailySales = await Sale.aggregate([
@@ -156,7 +154,7 @@ exports.monthlyPL = async (req, res, next) => {
     for (let i = months - 1; i >= 0; i--) {
       const now = new Date();
       const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const end   = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
 
       const [salesAgg, expAgg, purAgg] = await Promise.all([
         Sale.aggregate([
@@ -173,10 +171,10 @@ exports.monthlyPL = async (req, res, next) => {
         ])
       ]);
 
-      const revenue  = salesAgg[0]?.revenue  || 0;
-      const expenses = expAgg[0]?.total      || 0;
-      const purchases = purAgg[0]?.total     || 0;
-      const profit   = revenue - expenses - purchases;
+      const revenue = salesAgg[0]?.revenue || 0;
+      const expenses = expAgg[0]?.total || 0;
+      const purchases = purAgg[0]?.total || 0;
+      const profit = revenue - expenses - purchases;
 
       results.push({
         month: start.toISOString().slice(0, 7),
