@@ -144,7 +144,8 @@ exports.batchCheckAvailability = async (req, res, next) => {
           missing.push({
             ingredient: ing.name,
             required: item.quantity,
-            available: ing.stock
+            available: ing.stock,
+            deficit: Math.round((item.quantity - ing.stock) * 100) / 100
           });
         }
       }
@@ -157,6 +158,138 @@ exports.batchCheckAvailability = async (req, res, next) => {
     }
 
     res.json(results);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getAvailabilitySummary = async (req, res, next) => {
+  try {
+    const dishes = await Dish.find({ isAvailable: true }).populate('ingredients.ingredient');
+    const results = [];
+
+    for (const dish of dishes) {
+      const ingredientDetails = [];
+      let minPortions = Infinity;
+
+      for (const item of dish.ingredients) {
+        const ing = item.ingredient;
+        if (!ing) {
+          ingredientDetails.push({
+            name: 'Eliminado',
+            required: item.quantity,
+            available: 0,
+            unit: 'unidades',
+            maxPortions: 0
+          });
+          continue;
+        }
+
+        const maxForThisIngredient = ing.stock / item.quantity;
+        if (maxForThisIngredient < minPortions) {
+          minPortions = maxForThisIngredient;
+        }
+
+        ingredientDetails.push({
+          name: ing.name,
+          required: item.quantity,
+          available: ing.stock,
+          unit: ing.unit,
+          maxPortions: Math.floor(maxForThisIngredient)
+        });
+      }
+
+      const maxPortions = minPortions === Infinity ? 0 : Math.floor(minPortions);
+      const recipeCost = dish.ingredients.reduce((sum, item) => {
+        return sum + (item.ingredient?.cost || 0) * item.quantity;
+      }, 0);
+      const margin = dish.price > 0 ? ((dish.price - recipeCost) / dish.price * 100).toFixed(1) : 0;
+
+      results.push({
+        dishId: dish._id,
+        dishName: dish.name,
+        category: dish.category,
+        price: dish.price,
+        recipeCost: Math.round(recipeCost * 100) / 100,
+        margin: Number(margin),
+        available: maxPortions > 0,
+        maxPortions,
+        ingredients: ingredientDetails
+      });
+    }
+
+    results.sort((a, b) => b.maxPortions - a.maxPortions);
+    res.json({ dishes: results });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getAvailabilityById = async (req, res, next) => {
+  try {
+    const dish = await Dish.findById(req.params.id).populate('ingredients.ingredient');
+    if (!dish) return res.status(404).json({ message: 'Plato no encontrado' });
+
+    const ingredientDetails = [];
+    let minPortions = Infinity;
+    const missing = [];
+
+    for (const item of dish.ingredients) {
+      const ing = item.ingredient;
+      if (!ing) {
+        ingredientDetails.push({
+          name: 'Eliminado',
+          required: item.quantity,
+          available: 0,
+          unit: 'unidades',
+          maxPortions: 0
+        });
+        missing.push({ ingredient: 'Eliminado', required: item.quantity, available: 0 });
+        minPortions = 0;
+        continue;
+      }
+
+      const maxForThisIngredient = ing.stock / item.quantity;
+      if (maxForThisIngredient < minPortions) {
+        minPortions = maxForThisIngredient;
+      }
+
+      ingredientDetails.push({
+        name: ing.name,
+        required: item.quantity,
+        available: ing.stock,
+        unit: ing.unit,
+        maxPortions: Math.floor(maxForThisIngredient)
+      });
+
+      if (ing.stock < item.quantity) {
+        missing.push({
+          ingredient: ing.name,
+          required: item.quantity,
+          available: ing.stock,
+          deficit: Math.round((item.quantity - ing.stock) * 100) / 100
+        });
+      }
+    }
+
+    const maxPortions = minPortions === Infinity ? 0 : Math.floor(minPortions);
+    const recipeCost = dish.ingredients.reduce((sum, item) => {
+      return sum + (item.ingredient?.cost || 0) * item.quantity;
+    }, 0);
+    const margin = dish.price > 0 ? ((dish.price - recipeCost) / dish.price * 100).toFixed(1) : 0;
+
+    res.json({
+      dishId: dish._id,
+      dishName: dish.name,
+      category: dish.category,
+      price: dish.price,
+      recipeCost: Math.round(recipeCost * 100) / 100,
+      margin: Number(margin),
+      available: maxPortions > 0,
+      maxPortions,
+      ingredients: ingredientDetails,
+      missing
+    });
   } catch (error) {
     next(error);
   }

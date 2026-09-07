@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const dishIngredientSchema = new mongoose.Schema({
   ingredient: { type: mongoose.Schema.Types.ObjectId, ref: 'Ingredient', required: true },
-  quantity: { type: Number, required: true, min: 0 }
+  quantity: { type: Number, required: true, min: 0.01 }
 }, { _id: false });
 
 const dishSchema = new mongoose.Schema({

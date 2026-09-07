@@ -10,6 +10,8 @@ router.delete('/:id', authMiddleware, role('admin'), ctrl.remove);
 
 router.get('/:id/recipe-cost', authMiddleware, ctrl.getRecipeCost);
 router.get('/:id/availability', authMiddleware, ctrl.checkAvailability);
+router.get('/:id/availability-summary', authMiddleware, ctrl.getAvailabilityById);
 router.post('/batch-availability', authMiddleware, ctrl.batchCheckAvailability);
+router.get('/availability/summary', authMiddleware, ctrl.getAvailabilitySummary);
 
 module.exports = router;

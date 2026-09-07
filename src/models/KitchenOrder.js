@@ -8,7 +8,8 @@ const stateHistorySchema = new mongoose.Schema({
 }, { _id: false });
 
 const kitchenOrderItemSchema = new mongoose.Schema({
-  product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  product: { type: mongoose.Schema.Types.ObjectId, required: true },
+  productType: { type: String, enum: ['Product', 'Dish'], required: true },
   productName: { type: String, required: true },
   quantity: { type: Number, required: true, min: 1 },
   notes: { type: String }
@@ -30,5 +31,8 @@ const kitchenOrderSchema = new mongoose.Schema({
   assignedCook: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   printCount: { type: Number, default: 0 }
 }, { timestamps: true });
+
+kitchenOrderSchema.index({ status: 1, createdAt: -1 });
+kitchenOrderSchema.index({ sale: 1 });
 
 module.exports = mongoose.model('KitchenOrder', kitchenOrderSchema);

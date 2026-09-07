@@ -3,14 +3,32 @@ const mongoose = require('mongoose');
 const saleItemSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   productName: { type: String, required: true },
+  itemType: { type: String, enum: ['Product', 'Dish'], default: 'Product' },
   quantity: { type: Number, required: true, min: 1 },
   unitPrice: { type: Number, required: true, min: 0 },
   subtotal: { type: Number, required: true, min: 0 }
 }, { _id: false });
 
+const dishConsumptionSchema = new mongoose.Schema({
+  ingredient: { type: mongoose.Schema.Types.ObjectId, ref: 'Ingredient', required: true },
+  ingredientName: { type: String, required: true },
+  quantity: { type: Number, required: true, min: 0 },
+  unit: { type: String, default: 'unidades' }
+}, { _id: false });
+
+const saleDishItemSchema = new mongoose.Schema({
+  dish: { type: mongoose.Schema.Types.ObjectId, ref: 'Dish', required: true },
+  dishName: { type: String, required: true },
+  quantity: { type: Number, required: true, min: 1 },
+  unitPrice: { type: Number, required: true, min: 0 },
+  subtotal: { type: Number, required: true, min: 0 },
+  ingredientsConsumed: [dishConsumptionSchema]
+}, { _id: false });
+
 const saleSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   items: [saleItemSchema],
+  dishItems: [saleDishItemSchema],
   total: { type: Number, required: true, min: 0 },
   paymentMethod: { type: String, enum: ['efectivo', 'transferencia', 'mixto'], default: 'efectivo' },
   customerName: { type: String, default: 'Cliente general' },
