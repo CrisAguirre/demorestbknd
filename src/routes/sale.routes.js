@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth.middleware');
 const role = require('../middleware/role.middleware');
 
 router.post('/', authMiddleware, role('admin', 'cajero'), ctrl.create);
+router.post('/:id/add-items', authMiddleware, role('admin', 'cajero', 'mesero'), ctrl.addItems);
 router.get('/', authMiddleware, role('admin'), ctrl.getAll);
 router.get('/:id', authMiddleware, ctrl.getById);
 
