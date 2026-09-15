@@ -14,7 +14,12 @@ exports.getAll = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const { ingredients } = req.body;
+    let body = req.body;
+    // Si viene como multipart/form-data, ingredients puede ser JSON string
+    if (typeof body.ingredients === 'string') {
+      try { body.ingredients = JSON.parse(body.ingredients); } catch { body.ingredients = []; }
+    }
+    const { ingredients } = body;
     if (ingredients && ingredients.length > 0) {
       for (const item of ingredients) {
         const ing = await Ingredient.findById(item.ingredient);
@@ -23,7 +28,8 @@ exports.create = async (req, res, next) => {
         }
       }
     }
-    const dish = await Dish.create(req.body);
+    if (req.file) body.imageUrl = `/uploads/${req.file.filename}`;
+    const dish = await Dish.create(body);
     const populated = await dish.populate('ingredients.ingredient');
     res.status(201).json(populated);
   } catch (error) {
@@ -33,7 +39,11 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
   try {
-    const { ingredients } = req.body;
+    let body = req.body;
+    if (typeof body.ingredients === 'string') {
+      try { body.ingredients = JSON.parse(body.ingredients); } catch { body.ingredients = []; }
+    }
+    const { ingredients } = body;
     if (ingredients && ingredients.length > 0) {
       for (const item of ingredients) {
         const ing = await Ingredient.findById(item.ingredient);
@@ -42,7 +52,8 @@ exports.update = async (req, res, next) => {
         }
       }
     }
-    const dish = await Dish.findByIdAndUpdate(req.params.id, req.body, {
+    if (req.file) body.imageUrl = `/uploads/${req.file.filename}`;
+    const dish = await Dish.findByIdAndUpdate(req.params.id, body, {
       new: true, runValidators: true
     }).populate('ingredients.ingredient');
     if (!dish) return res.status(404).json({ message: 'Plato no encontrado' });
