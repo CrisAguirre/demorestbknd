@@ -12,7 +12,7 @@ exports.get = async (req, res, next) => {
 exports.update = async (req, res, next) => {
   try {
     const settings = await Settings.getSettings();
-    const { storeName, phone, address, whatsappNumber, theme } = req.body;
+    const { storeName, phone, address, whatsappNumber, theme, paymentMode } = req.body;
     let { email } = req.body;
     if (typeof email === 'string') {
       try { email = JSON.parse(email); } catch { email = undefined; }
@@ -23,6 +23,7 @@ exports.update = async (req, res, next) => {
     if (address) settings.address = address;
     if (whatsappNumber) settings.whatsappNumber = whatsappNumber;
     if (theme) settings.theme = { ...settings.theme, ...theme };
+    if (paymentMode) settings.paymentMode = paymentMode;
     if (email && typeof email === 'object') {
       settings.email = {
         host: email.host || settings.email?.host || '',

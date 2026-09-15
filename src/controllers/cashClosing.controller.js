@@ -27,9 +27,19 @@ exports.close = async (req, res, next) => {
       return res.status(400).json({ message: 'Esta caja ya fue cerrada' });
     }
 
-    // Calcular ventas del periodo
+    const pendingSales = await Sale.countDocuments({
+      createdAt: { $gte: cashClosing.openedAt, $lte: new Date() },
+      status: 'pendiente'
+    });
+
+    if (pendingSales > 0) {
+      return res.status(400).json({ message: `No se puede cerrar la caja. Hay ${pendingSales} cuentas (mesas) pendientes de pago.` });
+    }
+
+    // Calcular ventas del periodo (solo pagadas)
     const sales = await Sale.find({
-      createdAt: { $gte: cashClosing.openedAt, $lte: new Date() }
+      createdAt: { $gte: cashClosing.openedAt, $lte: new Date() },
+      status: 'pagada'
     });
 
     const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
@@ -72,8 +82,8 @@ exports.getCurrent = async (req, res, next) => {
     const current = await CashClosing.findOne({ status: 'abierta' }).populate('user', 'name');
     if (!current) return res.json({ open: false, message: 'No hay caja abierta' });
 
-    // Calcular ventas actuales
-    const sales = await Sale.find({ createdAt: { $gte: current.openedAt } });
+    // Calcular ventas actuales (solo pagadas)
+    const sales = await Sale.find({ createdAt: { $gte: current.openedAt }, status: 'pagada' });
     const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
 
     res.json({

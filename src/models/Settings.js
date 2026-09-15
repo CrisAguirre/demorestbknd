@@ -6,6 +6,7 @@ const settingsSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   address: { type: String, default: 'Carrera 5 # 16-11, Miraflores' },
   whatsappNumber: { type: String, default: '' },
+  paymentMode: { type: String, enum: ['pre-pago', 'post-pago'], default: 'pre-pago' },
   theme: {
     primaryNeon: { type: String, default: '#D4AF37' },
     secondaryNeon: { type: String, default: '#8B5A2B' }

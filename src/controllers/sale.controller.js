@@ -6,6 +6,7 @@ const Alert = require('../models/Alert');
 const Table = require('../models/Table');
 const KitchenOrder = require('../models/KitchenOrder');
 const DeliveryOrder = require('../models/DeliveryOrder');
+const Settings = require('../models/Settings');
 const { emitKitchenEvent, emitDataChange } = require('../services/socketService');
 
 async function recordMovement(document, type, quantity, previousStock, newStock, userId, reference, referenceModel, description) {
@@ -165,11 +166,18 @@ exports.create = async (req, res, next) => {
       }
     }
 
+    const settings = await Settings.getSettings();
+    let status = 'pagada';
+    if (settings.paymentMode === 'post-pago' && tableNumber) {
+      status = 'pendiente';
+    }
+
     const sale = await Sale.create([{
       user: req.user._id,
       items: saleItems,
       dishItems,
       total,
+      status,
       paymentMethod: paymentMethod || 'efectivo',
       customerName: customerName || 'Cliente general',
       notes
@@ -491,6 +499,56 @@ exports.addItems = async (req, res, next) => {
     }
     
     res.status(200).json(sale);
+  } catch (error) {
+    await session.abortTransaction();
+    next(error);
+  } finally {
+    session.endSession();
+  }
+};
+
+exports.pay = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const saleId = req.params.id;
+    const { paymentMethod } = req.body;
+
+    const sale = await Sale.findById(saleId).session(session);
+    if (!sale) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+
+    if (sale.status === 'pagada') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Esta venta ya está pagada' });
+    }
+
+    sale.status = 'pagada';
+    if (paymentMethod) sale.paymentMethod = paymentMethod;
+
+    await sale.save({ session });
+
+    // Liberar la mesa
+    const table = await Table.findOne({ currentSale: sale._id }).session(session);
+    if (table) {
+      table.isOccupied = false;
+      table.currentSale = null;
+      table.occupiedAt = null;
+      await table.save({ session });
+    }
+
+    await session.commitTransaction();
+
+    emitDataChange('sale', 'update', sale);
+    emitDataChange('current-cash', 'update', null);
+    if (table) {
+      emitDataChange('table', 'update', table);
+    }
+
+    res.json(sale);
   } catch (error) {
     await session.abortTransaction();
     next(error);

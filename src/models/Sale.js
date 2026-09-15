@@ -30,6 +30,7 @@ const saleSchema = new mongoose.Schema({
   items: [saleItemSchema],
   dishItems: [saleDishItemSchema],
   total: { type: Number, required: true, min: 0 },
+  status: { type: String, enum: ['pendiente', 'pagada', 'cancelada'], default: 'pagada' },
   paymentMethod: { type: String, enum: ['efectivo', 'transferencia', 'mixto'], default: 'efectivo' },
   customerName: { type: String, default: 'Cliente general' },
   notes: { type: String, default: '' }
