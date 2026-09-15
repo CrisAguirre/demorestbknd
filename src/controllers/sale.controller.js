@@ -6,7 +6,7 @@ const Alert = require('../models/Alert');
 const Table = require('../models/Table');
 const KitchenOrder = require('../models/KitchenOrder');
 const DeliveryOrder = require('../models/DeliveryOrder');
-const { emitKitchenEvent } = require('../services/socketService');
+const { emitKitchenEvent, emitDataChange } = require('../services/socketService');
 
 async function recordMovement(document, type, quantity, previousStock, newStock, userId, reference, referenceModel, description) {
   document.movementHistory.push({
@@ -37,6 +37,7 @@ exports.create = async (req, res, next) => {
     const dishItems = [];
     let total = 0;
     const alertsToCreate = [];
+    const eventsToEmit = [];
 
     for (const item of items) {
       const product = await Product.findById(item.product).session(session);
@@ -74,6 +75,8 @@ exports.create = async (req, res, next) => {
           `Venta de ${item.quantity} unidades`
         );
         await product.save({ session });
+        
+        eventsToEmit.push({ entity: 'product', action: 'update', data: { _id: product._id, stock: product.stock } });
 
         if (product.stock <= product.minStock) {
           alertsToCreate.push({
@@ -127,6 +130,8 @@ exports.create = async (req, res, next) => {
               `Consumo para "${dish.name}" x${item.quantity}`
             );
             await ing.save({ session });
+            
+            eventsToEmit.push({ entity: 'ingredient', action: 'update', data: { _id: ing._id, stock: ing.stock } });
 
             ingredientsConsumed.push({
               ingredient: ing._id,
@@ -226,9 +231,17 @@ exports.create = async (req, res, next) => {
       emitKitchenEvent('kitchen:order:new', kitchenOrder[0]);
     }
 
-    await Alert.insertMany(alertsToCreate, { session });
+    const insertedAlerts = await Alert.insertMany(alertsToCreate, { session });
+    if (insertedAlerts && insertedAlerts.length > 0) {
+      insertedAlerts.forEach(alert => {
+        eventsToEmit.push({ entity: 'alert', action: 'create', data: alert });
+      });
+    }
 
     await session.commitTransaction();
+    
+    eventsToEmit.forEach(ev => emitDataChange(ev.entity, ev.action, ev.data));
+    
     res.status(201).json(createdSale);
   } catch (error) {
     await session.abortTransaction();
