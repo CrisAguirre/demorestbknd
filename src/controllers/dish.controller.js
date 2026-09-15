@@ -14,7 +14,7 @@ exports.getAll = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    let body = req.body;
+    const body = req.body;
     // Si viene como multipart/form-data, ingredients puede ser JSON string
     if (typeof body.ingredients === 'string') {
       try { body.ingredients = JSON.parse(body.ingredients); } catch { body.ingredients = []; }
@@ -39,7 +39,7 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
   try {
-    let body = req.body;
+    const body = req.body;
     if (typeof body.ingredients === 'string') {
       try { body.ingredients = JSON.parse(body.ingredients); } catch { body.ingredients = []; }
     }

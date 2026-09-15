@@ -14,8 +14,7 @@ const upload = multer({
   limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = /jpeg|jpg|png|webp/;
-    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype))
-      return cb(null, true);
+    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) return cb(null, true);
     cb(new Error('Solo se permiten imágenes (jpg, png, webp)'));
   }
 });

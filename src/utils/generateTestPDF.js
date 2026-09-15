@@ -37,12 +37,6 @@ function testCase(id, title, steps, expected) {
   doc.moveDown(1);
 }
 
-function header2(text) {
-  doc.fontSize(12).font('Helvetica-Bold').fillColor('darkblue').text(text);
-  doc.fillColor('black');
-  doc.moveDown(0.3);
-}
-
 // SECCIÓN 1: INGREDIENTES
 section('1. GESTIÓN DE INGREDIENTES');
 

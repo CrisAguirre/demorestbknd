@@ -98,7 +98,6 @@ exports.create = async (req, res, next) => {
           subtotal,
           updateCost: !!item.updateCost
         });
-
       } else if (item.itemType === 'ingredient') {
         const ingredient = await Ingredient.findById(item.itemId).session(session);
         if (!ingredient) {
@@ -120,7 +119,6 @@ exports.create = async (req, res, next) => {
           subtotal,
           updateCost: !!item.updateCost
         });
-
       } else {
         await session.abortTransaction();
         return res.status(400).json({ message: `Tipo de ítem inválido: '${item.itemType}'. Debe ser 'product' o 'ingredient'.` });
