@@ -1,5 +1,6 @@
 const CashClosing = require('../models/CashClosing');
 const Sale = require('../models/Sale');
+const Event = require('../models/Event');
 
 exports.open = async (req, res, next) => {
   try {
@@ -43,11 +44,26 @@ exports.close = async (req, res, next) => {
     });
 
     const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
-    const expectedCash = cashClosing.initialAmount + totalSales;
+
+    // Buscar pagos de eventos en el periodo
+    const eventsWithPayments = await Event.find({
+      'payments.date': { $gte: cashClosing.openedAt, $lte: new Date() }
+    });
+
+    let totalEventPayments = 0;
+    eventsWithPayments.forEach(ev => {
+      ev.payments.forEach(p => {
+        if (p.date >= cashClosing.openedAt && p.date <= new Date()) {
+          totalEventPayments += p.amount;
+        }
+      });
+    });
+
+    const expectedCash = cashClosing.initialAmount + totalSales + totalEventPayments;
 
     cashClosing.closedAt = new Date();
-    cashClosing.totalSales = totalSales;
-    cashClosing.totalTransactions = sales.length;
+    cashClosing.totalSales = totalSales + totalEventPayments; // Lo sumamos para que cuadre la caja total
+    cashClosing.totalTransactions = sales.length + eventsWithPayments.length;
     cashClosing.expectedCash = expectedCash;
     cashClosing.actualCash = req.body.actualCash || 0;
     cashClosing.difference = cashClosing.actualCash - expectedCash;

@@ -2,6 +2,7 @@ const Sale = require('../models/Sale');
 const Purchase = require('../models/Purchase');
 const Expense = require('../models/Expense');
 const Product = require('../models/Product');
+const Event = require('../models/Event');
 
 function getRange(period) {
   const now = new Date();
@@ -21,7 +22,18 @@ exports.financialSummary = async (req, res, next) => {
 
     // Ingresos por ventas
     const sales = await Sale.find({ createdAt: { $gte: startDate } });
-    const totalRevenue = sales.reduce((s, sale) => s + sale.total, 0);
+    const saleRevenue = sales.reduce((s, sale) => s + sale.total, 0);
+
+    // Ingresos por eventos
+    const events = await Event.find({ 'payments.date': { $gte: startDate } });
+    let eventRevenue = 0;
+    events.forEach(ev => {
+      ev.payments.forEach(p => {
+        if (p.date >= startDate) eventRevenue += p.amount;
+      });
+    });
+
+    const totalRevenue = saleRevenue + eventRevenue;
 
     // Costo de ventas (COGS) = suma de (qty × purchasePrice) por ítem vendido
     const productIds = [...new Set(sales.flatMap(s => s.items.map(i => i.product?.toString())))];

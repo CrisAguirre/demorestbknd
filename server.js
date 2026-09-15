@@ -36,6 +36,7 @@ const tableRoutes = require('./src/routes/table.routes');
 const kitchenOrderRoutes = require('./src/routes/kitchenOrder.routes');
 const deliveryRoutes = require('./src/routes/delivery.routes');
 const reservationRoutes = require('./src/routes/reservation.routes');
+const eventRoutes = require('./src/routes/event.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -78,6 +79,7 @@ app.use('/api/tables', tableRoutes);
 app.use('/api/kitchen-orders', kitchenOrderRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/reservations', reservationRoutes);
+app.use('/api/events', eventRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), app: "La Soupe a l'Oignon API" });
