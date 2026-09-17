@@ -6,7 +6,8 @@ const saleItemSchema = new mongoose.Schema({
   itemType: { type: String, enum: ['Product', 'Dish'], default: 'Product' },
   quantity: { type: Number, required: true, min: 1 },
   unitPrice: { type: Number, required: true, min: 0 },
-  subtotal: { type: Number, required: true, min: 0 }
+  subtotal: { type: Number, required: true, min: 0 },
+  esAdicional: { type: Boolean, default: false }
 }, { _id: false });
 
 const dishConsumptionSchema = new mongoose.Schema({
@@ -22,6 +23,7 @@ const saleDishItemSchema = new mongoose.Schema({
   quantity: { type: Number, required: true, min: 1 },
   unitPrice: { type: Number, required: true, min: 0 },
   subtotal: { type: Number, required: true, min: 0 },
+  esAdicional: { type: Boolean, default: false },
   ingredientsConsumed: [dishConsumptionSchema]
 }, { _id: false });
 

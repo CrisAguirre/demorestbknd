@@ -337,7 +337,8 @@ exports.addItems = async (req, res, next) => {
           itemType: 'Product',
           quantity: item.quantity,
           unitPrice: product.salePrice,
-          subtotal
+          subtotal,
+          esAdicional: true
         });
         extraTotal += subtotal;
 
@@ -441,6 +442,7 @@ exports.addItems = async (req, res, next) => {
           quantity: item.quantity,
           unitPrice: dish.price,
           subtotal,
+          esAdicional: true,
           ingredientsConsumed
         });
         extraTotal += subtotal;
