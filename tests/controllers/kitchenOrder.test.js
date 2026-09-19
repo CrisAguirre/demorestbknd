@@ -39,7 +39,7 @@ describe('KitchenOrder Controller', () => {
     return await KitchenOrder.create({
       sale: sale._id,
       tableNumber: 1,
-      items: [{ product: new mongoose.Types.ObjectId(), productName: 'Burger', quantity: 2 }],
+      items: [{ product: new mongoose.Types.ObjectId(), productType: 'Product', productName: 'Burger', quantity: 2 }],
       status: 'nuevo',
       stateHistory: [{ state: 'nuevo', timestamp: new Date() }],
       ...overrides

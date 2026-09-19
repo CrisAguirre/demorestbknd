@@ -20,8 +20,8 @@ exports.financialSummary = async (req, res, next) => {
     const { period = 'month' } = req.query;
     const startDate = getRange(period);
 
-    // Ingresos por ventas
-    const sales = await Sale.find({ createdAt: { $gte: startDate } });
+    // Ingresos por ventas (sin anuladas)
+    const sales = await Sale.find({ createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } });
     const saleRevenue = sales.reduce((s, sale) => s + sale.total, 0);
 
     // Ingresos por eventos
@@ -69,7 +69,7 @@ exports.financialSummary = async (req, res, next) => {
 
     // Tendencia diaria de ingresos, compras y gastos
     const dailySales = await Sale.aggregate([
-      { $match: { createdAt: { $gte: startDate } } },
+      { $match: { createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } } },
       { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, revenue: { $sum: '$total' } } },
       { $sort: { _id: 1 } }
     ]);
@@ -120,7 +120,7 @@ exports.cashFlow = async (req, res, next) => {
 
     const [salesData, purchasesData, expensesData] = await Promise.all([
       Sale.aggregate([
-        { $match: { createdAt: { $gte: startDate } } },
+        { $match: { createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } } },
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, inflow: { $sum: '$total' } } }
       ]),
       Purchase.aggregate([
@@ -170,7 +170,7 @@ exports.monthlyPL = async (req, res, next) => {
 
       const [salesAgg, expAgg, purAgg] = await Promise.all([
         Sale.aggregate([
-          { $match: { createdAt: { $gte: start, $lte: end } } },
+          { $match: { createdAt: { $gte: start, $lte: end }, status: { $ne: 'cancelada' } } },
           { $group: { _id: null, revenue: { $sum: '$total' }, count: { $sum: 1 } } }
         ]),
         Expense.aggregate([

@@ -26,9 +26,9 @@ function getStartDate(period) {
 async function buildSalesSummary(period) {
   const startDate = getStartDate(period);
   const [sales, salesByDay] = await Promise.all([
-    Sale.find({ createdAt: { $gte: startDate } }).lean(),
+    Sale.find({ createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } }).lean(),
     Sale.aggregate([
-      { $match: { createdAt: { $gte: startDate } } },
+      { $match: { createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } } },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -52,7 +52,7 @@ async function buildCurrentCash() {
   const current = await CashClosing.findOne({ status: 'abierta' }).populate('user', 'name').lean();
   if (!current) return { open: false, message: 'No hay caja abierta' };
 
-  const sales = await Sale.find({ createdAt: { $gte: current.openedAt } }).lean();
+  const sales = await Sale.find({ createdAt: { $gte: current.openedAt }, status: { $ne: 'cancelada' } }).lean();
   const totalSales = sales.reduce((s, x) => s + x.total, 0);
   return {
     open: true,
@@ -113,6 +113,7 @@ exports.preload = async (req, res, next) => {
 
       // 7. Top 5 products
       Sale.aggregate([
+        { $match: { status: { $ne: 'cancelada' } } },
         { $unwind: '$items' },
         {
           $group: {

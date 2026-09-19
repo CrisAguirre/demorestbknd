@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Dish = require('../models/Dish');
+const Ingredient = require('../models/Ingredient');
 const Alert = require('../models/Alert');
 const Table = require('../models/Table');
 const KitchenOrder = require('../models/KitchenOrder');
@@ -22,12 +23,84 @@ async function recordMovement(document, type, quantity, previousStock, newStock,
   });
 }
 
+// Descuenta del inventario todo lo vendido en la factura (productos + insumos
+// de platos según los consumos guardados al registrar). Se ejecuta al cobrar.
+// Retorna null si todo OK, o un mensaje de error (sin mutar nada en ese caso,
+// pues quien llama aborta la transacción).
+async function deductSaleStock(sale, userId, session, eventsToEmit, alertsToCreate) {
+  for (const i of sale.items) {
+    const product = await Product.findById(i.product).session(session);
+    if (!product) return `Producto "${i.productName}" ya no existe en inventario`;
+    if (product.stock < i.quantity) {
+      return `Stock insuficiente para "${product.name}" (disponible: ${product.stock})`;
+    }
+    const previousStock = product.stock;
+    product.stock -= i.quantity;
+    await product.save({ session });
+
+    await recordMovement(
+      product, 'sale', i.quantity, previousStock, product.stock,
+      userId, sale._id, 'Sale', `Venta ${sale._id} cobrada (${i.quantity} unidades)`
+    );
+    await product.save({ session });
+
+    eventsToEmit.push({ entity: 'product', action: 'update', data: { _id: product._id, stock: product.stock } });
+
+    if (product.stock <= product.minStock) {
+      alertsToCreate.push({
+        product: product._id,
+        type: product.stock === 0 ? 'sin_stock' : 'stock_bajo',
+        message: product.stock === 0
+          ? `"${product.name}" se ha agotado`
+          : `"${product.name}" tiene stock bajo (${product.stock} unidades)`,
+        priority: product.stock === 0 ? 'alta' : 'media'
+      });
+    }
+  }
+
+  for (const d of sale.dishItems) {
+    for (const c of (d.ingredientsConsumed || [])) {
+      const ing = await Ingredient.findById(c.ingredient).session(session);
+      if (!ing) return `Insumo "${c.ingredientName}" ya no existe en inventario`;
+      if (ing.stock < c.quantity) {
+        return `Stock insuficiente de "${ing.name}" (necesario: ${c.quantity}, disponible: ${ing.stock})`;
+      }
+      const previousStock = ing.stock;
+      ing.stock -= c.quantity;
+      await ing.save({ session });
+
+      await recordMovement(
+        ing, 'sale', c.quantity, previousStock, ing.stock,
+        userId, sale._id, 'Sale', `Consumo venta ${sale._id} ("${d.dishName}" x${d.quantity})`
+      );
+      await ing.save({ session });
+
+      eventsToEmit.push({ entity: 'ingredient', action: 'update', data: { _id: ing._id, stock: ing.stock } });
+
+      if (ing.stock <= ing.minStock) {
+        alertsToCreate.push({
+          ingredient: ing._id,
+          type: ing.stock === 0 ? 'sin_stock' : 'stock_bajo',
+          message: ing.stock === 0
+            ? `"${ing.name}" se ha agotado (insumo para "${d.dishName}")`
+            : `"${ing.name}" tiene stock bajo (${ing.stock}) - insumo para "${d.dishName}"`,
+          priority: ing.stock === 0 ? 'alta' : 'media'
+        });
+      }
+    }
+  }
+
+  return null;
+}
+
 exports.create = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { items, paymentMethod, customerName, notes, tableNumber } = req.body;
+    // La mesa 0 (Para llevar) también puede tener venta abierta: el 0 es válido
+    const hasTable = tableNumber !== undefined && tableNumber !== null;
 
     if (!items || items.length === 0) {
       await session.abortTransaction();
@@ -59,36 +132,8 @@ exports.create = async (req, res, next) => {
           subtotal
         });
         total += subtotal;
-
-        const previousStock = product.stock;
-        product.stock -= item.quantity;
-        await product.save({ session });
-
-        await recordMovement(
-          product,
-          'sale',
-          item.quantity,
-          previousStock,
-          product.stock,
-          req.user._id,
-          null,
-          'Sale',
-          `Venta de ${item.quantity} unidades`
-        );
-        await product.save({ session });
-        
-        eventsToEmit.push({ entity: 'product', action: 'update', data: { _id: product._id, stock: product.stock } });
-
-        if (product.stock <= product.minStock) {
-          alertsToCreate.push({
-            product: product._id,
-            type: product.stock === 0 ? 'sin_stock' : 'stock_bajo',
-            message: product.stock === 0
-              ? `"${product.name}" se ha agotado`
-              : `"${product.name}" tiene stock bajo (${product.stock} unidades)`,
-            priority: product.stock === 0 ? 'alta' : 'media'
-          });
-        }
+        // NOTA: el stock NO se descuenta aquí. Se descuenta al cobrar (pay),
+        // cuando la compra se concreta. Aquí solo se valida disponibilidad.
       } else {
         const dish = await Dish.findById(item.product).populate('ingredients.ingredient');
         if (!dish) {
@@ -111,46 +156,18 @@ exports.create = async (req, res, next) => {
         }
 
         const subtotal = dish.price * item.quantity;
+        // Se calculan los consumos para guardarlos en la venta (se descuentan al cobrar).
+        // Aquí solo se valida disponibilidad, sin mover stock.
         for (const recipeItem of dish.ingredients) {
           const ing = recipeItem.ingredient;
           if (ing) {
             const needed = recipeItem.quantity * item.quantity;
-            const previousStock = ing.stock;
-            ing.stock -= needed;
-            await ing.save({ session });
-
-            await recordMovement(
-              ing,
-              'sale',
-              needed,
-              previousStock,
-              ing.stock,
-              req.user._id,
-              null,
-              'Sale',
-              `Consumo para "${dish.name}" x${item.quantity}`
-            );
-            await ing.save({ session });
-            
-            eventsToEmit.push({ entity: 'ingredient', action: 'update', data: { _id: ing._id, stock: ing.stock } });
-
             ingredientsConsumed.push({
               ingredient: ing._id,
               ingredientName: ing.name,
               quantity: needed,
               unit: ing.unit
             });
-
-            if (ing.stock <= ing.minStock) {
-              alertsToCreate.push({
-                ingredient: ing._id,
-                type: ing.stock === 0 ? 'sin_stock' : 'stock_bajo',
-                message: ing.stock === 0
-                  ? `"${ing.name}" se ha agotado (insumo para "${dish.name}")`
-                  : `"${ing.name}" tiene stock bajo (${ing.stock}) - insumo para "${dish.name}"`,
-                priority: ing.stock === 0 ? 'alta' : 'media'
-              });
-            }
           }
         }
 
@@ -168,7 +185,7 @@ exports.create = async (req, res, next) => {
 
     const settings = await Settings.getSettings();
     let status = 'pagada';
-    if (settings.paymentMode === 'post-pago' && tableNumber) {
+    if (settings.paymentMode === 'post-pago' && hasTable) {
       status = 'pendiente';
     }
 
@@ -185,10 +202,12 @@ exports.create = async (req, res, next) => {
 
     const createdSale = sale[0];
 
-    if (tableNumber) {
+    // Solo se ocupa la mesa si la venta queda abierta (pendiente).
+    // Una venta de cobro inmediato (pagada) no debe ocupar mesa.
+    if (hasTable && status === 'pendiente') {
       const table = await Table.findOne({ number: tableNumber }).session(session);
-      if (table && !table.isOccupied) {
-        table.isOccupied = true;
+      if (table && table.status !== 'ocupada') {
+        table.status = 'ocupada';
         table.currentSale = createdSale._id;
         table.occupiedAt = new Date();
         await table.save({ session });
@@ -341,36 +360,8 @@ exports.addItems = async (req, res, next) => {
           esAdicional: true
         });
         extraTotal += subtotal;
-
-        const previousStock = product.stock;
-        product.stock -= item.quantity;
-        await product.save({ session });
-
-        await recordMovement(
-          product,
-          'sale',
-          item.quantity,
-          previousStock,
-          product.stock,
-          req.user._id,
-          sale._id,
-          'Sale',
-          `Adición a venta de ${item.quantity} unidades`
-        );
-        await product.save({ session });
-        
-        eventsToEmit.push({ entity: 'product', action: 'update', data: { _id: product._id, stock: product.stock } });
-
-        if (product.stock <= product.minStock) {
-          alertsToCreate.push({
-            product: product._id,
-            type: product.stock === 0 ? 'sin_stock' : 'stock_bajo',
-            message: product.stock === 0
-              ? `"${product.name}" se ha agotado`
-              : `"${product.name}" tiene stock bajo (${product.stock} unidades)`,
-            priority: product.stock === 0 ? 'alta' : 'media'
-          });
-        }
+        // NOTA: el stock NO se descuenta aquí. Se descuenta al cobrar (pay).
+        // Aquí solo se valida disponibilidad.
       } else {
         const dish = await Dish.findById(item.product).populate('ingredients.ingredient');
         if (!dish) {
@@ -393,46 +384,18 @@ exports.addItems = async (req, res, next) => {
         }
 
         const subtotal = dish.price * item.quantity;
+        // Se calculan los consumos para guardarlos en la venta (se descuentan al cobrar).
+        // Aquí solo se valida disponibilidad, sin mover stock.
         for (const recipeItem of dish.ingredients) {
           const ing = recipeItem.ingredient;
           if (ing) {
             const needed = recipeItem.quantity * item.quantity;
-            const previousStock = ing.stock;
-            ing.stock -= needed;
-            await ing.save({ session });
-
-            await recordMovement(
-              ing,
-              'sale',
-              needed,
-              previousStock,
-              ing.stock,
-              req.user._id,
-              sale._id,
-              'Sale',
-              `Consumo extra para "${dish.name}" x${item.quantity}`
-            );
-            await ing.save({ session });
-            
-            eventsToEmit.push({ entity: 'ingredient', action: 'update', data: { _id: ing._id, stock: ing.stock } });
-
             ingredientsConsumed.push({
               ingredient: ing._id,
               ingredientName: ing.name,
               quantity: needed,
               unit: ing.unit
             });
-
-            if (ing.stock <= ing.minStock) {
-              alertsToCreate.push({
-                ingredient: ing._id,
-                type: ing.stock === 0 ? 'sin_stock' : 'stock_bajo',
-                message: ing.stock === 0
-                  ? `"${ing.name}" se ha agotado (insumo para "${dish.name}")`
-                  : `"${ing.name}" tiene stock bajo (${ing.stock}) - insumo para "${dish.name}"`,
-                priority: ing.stock === 0 ? 'alta' : 'media'
-              });
-            }
           }
         }
 
@@ -528,6 +491,24 @@ exports.pay = async (req, res, next) => {
       return res.status(400).json({ message: 'Esta venta ya está pagada' });
     }
 
+    if (sale.status === 'cancelada') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Esta venta está anulada y no se puede cobrar' });
+    }
+
+    // Al concretarse la compra con el cobro se descuenta el inventario.
+    // Si la venta ya lo tenía descontado (ventas anteriores al cambio), no se repite.
+    const eventsToEmit = [];
+    const alertsToCreate = [];
+    if (!sale.stockDeducted) {
+      const stockError = await deductSaleStock(sale, req.user._id, session, eventsToEmit, alertsToCreate);
+      if (stockError) {
+        await session.abortTransaction();
+        return res.status(400).json({ message: stockError });
+      }
+      sale.stockDeducted = true;
+    }
+
     sale.status = 'pagada';
     if (paymentMethod) sale.paymentMethod = paymentMethod;
 
@@ -536,7 +517,73 @@ exports.pay = async (req, res, next) => {
     // Liberar la mesa
     const table = await Table.findOne({ currentSale: sale._id }).session(session);
     if (table) {
-      table.isOccupied = false;
+      table.status = 'libre';
+      table.currentSale = null;
+      table.occupiedAt = null;
+      await table.save({ session });
+    }
+
+    const insertedAlerts = await Alert.insertMany(alertsToCreate, { session });
+    if (insertedAlerts && insertedAlerts.length > 0) {
+      insertedAlerts.forEach(alert => {
+        eventsToEmit.push({ entity: 'alert', action: 'create', data: alert });
+      });
+    }
+
+    await session.commitTransaction();
+
+    eventsToEmit.forEach(ev => emitDataChange(ev.entity, ev.action, ev.data));
+    emitDataChange('sale', 'update', sale);
+    emitDataChange('current-cash', 'update', null);
+    if (table) {
+      emitDataChange('table', 'update', table);
+    }
+
+    res.json(sale);
+  } catch (error) {
+    await session.abortTransaction();
+    next(error);
+  } finally {
+    session.endSession();
+  }
+};
+
+exports.cancel = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'El motivo de anulación es obligatorio' });
+    }
+
+    const sale = await Sale.findById(req.params.id).session(session);
+    if (!sale) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+
+    if (sale.status === 'pagada') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'No se puede anular una venta ya pagada' });
+    }
+
+    if (sale.status === 'cancelada') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Esta venta ya está anulada' });
+    }
+
+    // Como el inventario se descuenta al cobrar y esta venta nunca se cobró,
+    // no hay stock que devolver: solo se marca y se libera la mesa.
+    sale.status = 'cancelada';
+    sale.notes = sale.notes ? `${sale.notes} | Anulada: ${reason.trim()}` : `Anulada: ${reason.trim()}`;
+    await sale.save({ session });
+
+    const table = await Table.findOne({ currentSale: sale._id }).session(session);
+    if (table) {
+      table.status = 'libre';
       table.currentSale = null;
       table.occupiedAt = null;
       await table.save({ session });
@@ -545,7 +592,6 @@ exports.pay = async (req, res, next) => {
     await session.commitTransaction();
 
     emitDataChange('sale', 'update', sale);
-    emitDataChange('current-cash', 'update', null);
     if (table) {
       emitDataChange('table', 'update', table);
     }

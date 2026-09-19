@@ -42,6 +42,15 @@ describe('Report Controller', () => {
     expect(res.body[0].totalQuantity).toBe(5);
   });
 
+  it('should exclude cancelled sales from summary', async () => {
+    await Sale.create({ user: admin._id, status: 'pagada', items: [{ product: product._id, productName: 'P', quantity: 1, unitPrice: 2000, subtotal: 2000 }], total: 2000 });
+    await Sale.create({ user: admin._id, status: 'cancelada', items: [{ product: product._id, productName: 'P', quantity: 5, unitPrice: 2000, subtotal: 10000 }], total: 10000 });
+    const res = await request(app).get('/api/reports/sales-summary').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.totalRevenue).toBe(2000);
+    expect(res.body.totalTransactions).toBe(1);
+  });
+
   it('should return inventory valuation', async () => {
     const res = await request(app).get('/api/reports/inventory-valuation').set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
@@ -63,7 +72,7 @@ describe('Report Controller', () => {
     await KitchenOrder.create({
       sale: new mongoose.Types.ObjectId(),
       tableNumber: 5,
-      items: [{ product: new mongoose.Types.ObjectId(), productName: 'Pizza', quantity: 2 }],
+      items: [{ product: new mongoose.Types.ObjectId(), productType: 'Product', productName: 'Pizza', quantity: 2 }],
       status: 'entregado',
       stateHistory: [
         { state: 'nuevo', timestamp: new Date(now - 600000) },
