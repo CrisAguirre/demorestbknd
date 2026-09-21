@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const tableSchema = new mongoose.Schema({
   number: { type: Number, required: true, unique: true },
   name: { type: String, default: null },
+  zona: { type: String, default: 'Salón 1' },
   status: {
     type: String,
     enum: ['libre', 'ocupada', 'reservada'],
