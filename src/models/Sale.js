@@ -35,7 +35,10 @@ const saleSchema = new mongoose.Schema({
   status: { type: String, enum: ['pendiente', 'pagada', 'cancelada'], default: 'pagada' },
   paymentMethod: { type: String, enum: ['efectivo', 'transferencia', 'mixto'], default: 'efectivo' },
   customerName: { type: String, default: 'Cliente general' },
-  notes: { type: String, default: '' }
+  notes: { type: String, default: '' },
+  // El inventario se descuenta al cobrar (pay), no al registrar.
+  // Las ventas pendientes creadas antes de este cambio ya descontaron: ver backfill-stockdeducted.js
+  stockDeducted: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Sale', saleSchema);

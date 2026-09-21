@@ -26,7 +26,7 @@ beforeEach(async () => {
 
 describe('Purchase Controller', () => {
   it('should create a purchase and update stock', async () => {
-    const res = await request(app).post('/api/purchases').set('Authorization', `Bearer ${adminToken}`).send({ supplierId: supplier._id, items: [{ productId: product._id, quantity: 20, unitCost: 1200 }] });
+    const res = await request(app).post('/api/purchases').set('Authorization', `Bearer ${adminToken}`).send({ supplierId: supplier._id, items: [{ itemType: 'product', itemId: product._id, quantity: 20, unitCost: 1200 }] });
     expect(res.status).toBe(201);
     expect(res.body.total).toBe(24000);
     const updated = await Product.findById(product._id);
@@ -34,7 +34,7 @@ describe('Purchase Controller', () => {
   });
 
   it('should revert stock when cancelled', async () => {
-    const purchase = await Purchase.create({ supplier: supplier._id, supplierName: 'Sup', user: admin._id, items: [{ product: product._id, productName: 'P', quantity: 10, unitCost: 100, subtotal: 1000 }], total: 1000, status: 'recibida' });
+    const purchase = await Purchase.create({ supplier: supplier._id, supplierName: 'Sup', user: admin._id, items: [{ itemType: 'product', product: product._id, itemName: 'P', quantity: 10, unitCost: 100, subtotal: 1000 }], total: 1000, status: 'recibida' });
     product.stock = 20;
     await product.save();
     const res = await request(app).patch(`/api/purchases/${purchase._id}/status`).set('Authorization', `Bearer ${adminToken}`).send({ status: 'anulada' });

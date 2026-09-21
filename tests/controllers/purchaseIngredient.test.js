@@ -149,9 +149,9 @@ describe('PurchaseIngredient Controller', () => {
     expect(res.status).toBe(401);
   });
 
-  it('should reject non-admin for create', async () => {
-    const cajero = await User.create({ name: 'C', email: 'c@test.com', passwordHash: 'Pass123!', role: 'cajero' });
-    const token = require('jsonwebtoken').sign({ id: cajero._id }, process.env.JWT_SECRET);
+  it('should reject unauthorized role for create', async () => {
+    const mesero = await User.create({ name: 'M', email: 'm@test.com', passwordHash: 'Pass123!', role: 'mesero' });
+    const token = require('jsonwebtoken').sign({ id: mesero._id }, process.env.JWT_SECRET);
 
     const res = await request(app)
       .post('/api/purchases-ingredients')

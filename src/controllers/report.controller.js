@@ -18,14 +18,14 @@ exports.salesSummary = async (req, res, next) => {
     const { period = 'day' } = req.query;
     const startDate = getStartDate(period);
 
-    const sales = await Sale.find({ createdAt: { $gte: startDate } });
+    const sales = await Sale.find({ createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } });
     const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
     const totalTransactions = sales.length;
     const averageTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
     // Daily trend
     const salesByDay = await Sale.aggregate([
-      { $match: { createdAt: { $gte: startDate } } },
+      { $match: { createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } } },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -50,6 +50,7 @@ exports.topProducts = async (req, res, next) => {
   try {
     const { limit = 10 } = req.query;
     const topProducts = await Sale.aggregate([
+      { $match: { status: { $ne: 'cancelada' } } },
       { $unwind: '$items' },
       {
         $group: {
@@ -73,7 +74,7 @@ exports.lowRotation = async (req, res, next) => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const soldProductIds = await Sale.aggregate([
-      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      { $match: { createdAt: { $gte: thirtyDaysAgo }, status: { $ne: 'cancelada' } } },
       { $unwind: '$items' },
       { $group: { _id: '$items.product' } }
     ]);
@@ -104,7 +105,7 @@ exports.salesByCategory = async (req, res, next) => {
     });
 
     const salesData = await Sale.aggregate([
-      { $match: { createdAt: { $gte: startDate } } },
+      { $match: { createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } } },
       { $unwind: '$items' },
       {
         $group: {
@@ -140,7 +141,7 @@ exports.salesByPaymentMethod = async (req, res, next) => {
     const startDate = getStartDate(period);
 
     const data = await Sale.aggregate([
-      { $match: { createdAt: { $gte: startDate } } },
+      { $match: { createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } } },
       {
         $group: {
           _id: '$paymentMethod',
@@ -164,7 +165,7 @@ exports.salesByHour = async (req, res, next) => {
     const startDate = getStartDate(period);
 
     const data = await Sale.aggregate([
-      { $match: { createdAt: { $gte: startDate } } },
+      { $match: { createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } } },
       {
         $group: {
           _id: { $hour: '$createdAt' },
@@ -355,7 +356,7 @@ exports.exportSalesSummaryCSV = async (req, res, next) => {
   try {
     const { period = 'month' } = req.query;
     const startDate = getStartDate(period);
-    const sales = await Sale.find({ createdAt: { $gte: startDate } }).sort({ createdAt: -1 }).lean();
+    const sales = await Sale.find({ createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } }).sort({ createdAt: -1 }).lean();
 
     const rows = sales.map(s => ({
       date: s.createdAt ? s.createdAt.toISOString().split('T')[0] : '',
@@ -386,6 +387,7 @@ exports.exportSalesSummaryCSV = async (req, res, next) => {
 exports.exportTopProductsCSV = async (req, res, next) => {
   try {
     const topProducts = await Sale.aggregate([
+      { $match: { status: { $ne: 'cancelada' } } },
       { $unwind: '$items' },
       {
         $group: {

@@ -1,12 +1,14 @@
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const jwt = require('jsonwebtoken');
 
 let mongoServer;
 
 async function connectDB() {
   if (mongoose.connection.readyState !== 0) return;
-  mongoServer = await MongoMemoryServer.create();
+  // Replica set de 1 nodo: los controladores usan transacciones multi-documento
+  // (startSession/startTransaction), que un mongod standalone no soporta.
+  mongoServer = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   const uri = mongoServer.getUri();
   process.env.JWT_SECRET = 'test-jwt-secret';
   process.env.JWT_REFRESH_SECRET = 'test-jwt-refresh-secret';

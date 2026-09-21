@@ -6,6 +6,7 @@ const role = require('../middleware/role.middleware');
 router.post('/', authMiddleware, role('admin', 'cajero'), ctrl.create);
 router.post('/:id/add-items', authMiddleware, role('admin', 'cajero', 'mesero'), ctrl.addItems);
 router.post('/:id/pay', authMiddleware, role('admin', 'cajero'), ctrl.pay);
+router.post('/:id/cancel', authMiddleware, role('admin', 'cajero'), ctrl.cancel);
 router.get('/', authMiddleware, role('admin'), ctrl.getAll);
 router.get('/:id', authMiddleware, ctrl.getById);
 
