@@ -13,6 +13,8 @@ const ingredientMovementSchema = new mongoose.Schema({
 
 const ingredientSchema = new mongoose.Schema({
   name: { type: String, required: [true, 'El nombre del ingrediente es requerido'], trim: true },
+  code: { type: String, unique: true, sparse: true, trim: true },
+  area: { type: String, enum: ['cocina', 'barra', 'servicio'], default: 'cocina' },
   unit: { type: String, required: true, default: 'unidades' },
   ubicacion: { type: String, default: '' },
   stock: { type: Number, required: true, default: 0, min: 0 },

@@ -8,7 +8,11 @@ async function connectDB() {
   if (mongoose.connection.readyState !== 0) return;
   // Replica set de 1 nodo: los controladores usan transacciones multi-documento
   // (startSession/startTransaction), que un mongod standalone no soporta.
-  mongoServer = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+  // launchTimeout alto: en Windows el primer arranque puede ser lento (antivirus).
+  mongoServer = await MongoMemoryReplSet.create({
+    replSet: { count: 1 },
+    instance: { launchTimeout: 120000 },
+  });
   const uri = mongoServer.getUri();
   process.env.JWT_SECRET = 'test-jwt-secret';
   process.env.JWT_REFRESH_SECRET = 'test-jwt-refresh-secret';

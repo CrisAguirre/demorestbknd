@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "seed": "node src/utils/seedAdmin.js",
     "seed:menu": "node src/utils/seedMenu.js",
+    "seed:recetas": "node src/utils/seedRecetasDemo.js",
     "seed:all": "node src/utils/seedAdmin.js && node src/utils/seedMenu.js",
     "test": "jest --forceExit --detectOpenHandles",
     "test:watch": "jest --watch",
