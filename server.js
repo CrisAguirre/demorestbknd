@@ -93,5 +93,8 @@ connectDB().then(() => {
     console.log(`\n🏪 La Soupe a l'Oignon API corriendo en puerto ${PORT}`);
     console.log(`📡 Entorno: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔗 Health: http://localhost:${PORT}/api/health\n`);
+    // Seeds/datos iniciales (una sola vez, por versión; nunca bloquean ni tumban el arranque)
+    const { runBootSeeds } = require('./src/utils/runBootSeeds');
+    runBootSeeds().catch((err) => console.error('[boot-seeds] error:', err.message));
   });
 });

@@ -30,10 +30,7 @@ const items = [
   { code: 'BI-006', name: 'Menta fresca para coctelería', unit: 'atado', ubicacion: 'Refrigerador barra', stock: 4, minStock: 3, cost: 0, area: 'barra' },
 ];
 
-async function seed() {
-  await mongoose.connect(process.env.MONGODB_URI);
-  console.log('✅ Conectado a MongoDB');
-
+async function seedBarraData() {
   let creados = 0;
   for (const item of items) {
     const r = await Ingredient.findOneAndUpdate(
@@ -45,12 +42,21 @@ async function seed() {
   }
   console.log(`🍹 Barra: ${items.length} ítems verificados (${creados} nuevos, resto intactos)`);
   console.log('\n✅ Seed completado (upsert, nada existente fue borrado ni modificado)');
-
-  await mongoose.disconnect();
-  process.exit(0);
+  return { verificados: items.length, creados };
 }
 
-seed().catch((err) => {
-  console.error('❌ Error en seed:', err.message);
-  process.exit(1);
-});
+module.exports = { seedBarraData };
+
+// CLI: node src/utils/seedBarraDemo.js (requiere .env con MONGODB_URI)
+if (require.main === module) {
+  (async () => {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✅ Conectado a MongoDB');
+    await seedBarraData();
+    await mongoose.disconnect();
+    process.exit(0);
+  })().catch((err) => {
+    console.error('❌ Error en seed:', err.message);
+    process.exit(1);
+  });
+}

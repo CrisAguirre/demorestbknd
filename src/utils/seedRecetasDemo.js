@@ -73,10 +73,7 @@ const platos = [
   },
 ];
 
-async function seed() {
-  await mongoose.connect(process.env.MONGODB_URI);
-  console.log('✅ Conectado a MongoDB');
-
+async function seedRecetasData() {
   const mapa = {};
   for (const ing of ingredientes) {
     const doc = await Ingredient.findOneAndUpdate(
@@ -109,11 +106,21 @@ async function seed() {
   }
 
   console.log('\n✅ Seed demo completado (upsert, nada existente fue borrado)');
-  await mongoose.disconnect();
-  process.exit(0);
+  return { ingredientes: ingredientes.length, platos: platos.length };
 }
 
-seed().catch((err) => {
-  console.error('❌ Error en seed:', err.message);
-  process.exit(1);
-});
+module.exports = { seedRecetasData };
+
+// CLI: node src/utils/seedRecetasDemo.js (requiere .env con MONGODB_URI)
+if (require.main === module) {
+  (async () => {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✅ Conectado a MongoDB');
+    await seedRecetasData();
+    await mongoose.disconnect();
+    process.exit(0);
+  })().catch((err) => {
+    console.error('❌ Error en seed:', err.message);
+    process.exit(1);
+  });
+}
