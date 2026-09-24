@@ -13,7 +13,7 @@ const Sale = require('../models/Sale');
 const { seedRecetasData } = require('./seedRecetasDemo');
 const { seedBarraData } = require('./seedBarraDemo');
 
-const CURRENT_SEED_VERSION = 1;
+const CURRENT_SEED_VERSION = 2;
 
 async function backfillStockDeducted(log) {
   // Ventas pendientes creadas con el código anterior YA descontaron stock
@@ -25,10 +25,20 @@ async function backfillStockDeducted(log) {
   (log || console).log(`[boot-seeds] ventas pendientes marcadas: ${r.modifiedCount || 0}`);
 }
 
+async function migrarPostPago(log) {
+  // Toda la operación es post-pago: las configs viejas en pre-pago pasan a post-pago.
+  const r = await Settings.updateMany(
+    { paymentMode: 'pre-pago' },
+    { $set: { paymentMode: 'post-pago' } }
+  );
+  (log || console).log(`[boot-seeds] configs a post-pago: ${r.modifiedCount || 0}`);
+}
+
 const PASOS = [
   { version: 1, nombre: 'backfill-stockdeducted', fn: backfillStockDeducted },
   { version: 1, nombre: 'seed-recetas-demo', fn: seedRecetasData },
   { version: 1, nombre: 'seed-barra-demo', fn: seedBarraData },
+  { version: 2, nombre: 'migrar-post-pago', fn: migrarPostPago },
 ];
 
 async function runBootSeeds(log) {

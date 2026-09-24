@@ -10,6 +10,14 @@ const DeliveryOrder = require('../models/DeliveryOrder');
 const Settings = require('../models/Settings');
 const { emitKitchenEvent, emitDataChange } = require('../services/socketService');
 
+// Interruptor maestro del descuento de inventario.
+// En OFF (actual): las ventas NO validan ni descuentan stock; la mesa
+// siempre se cobra al final. En ON: se valida al registrar y se descuenta
+// al cobrar. Cambiar a true cuando recetas e inventario estén configurados.
+let DESCONTAR_INVENTARIO = false;
+exports.setDescontarInventario = (v) => { DESCONTAR_INVENTARIO = !!v; };
+exports.getDescontarInventario = () => DESCONTAR_INVENTARIO;
+
 async function recordMovement(document, type, quantity, previousStock, newStock, userId, reference, referenceModel, description) {
   document.movementHistory.push({
     type,
@@ -116,7 +124,7 @@ exports.create = async (req, res, next) => {
     for (const item of items) {
       const product = await Product.findById(item.product).session(session);
       if (product) {
-        if (product.stock < item.quantity) {
+        if (DESCONTAR_INVENTARIO && product.stock < item.quantity) {
           await session.abortTransaction();
           return res.status(400).json({
             message: `Stock insuficiente para "${product.name}" (disponible: ${product.stock})`
@@ -146,7 +154,7 @@ exports.create = async (req, res, next) => {
           const ing = recipeItem.ingredient;
           if (ing) {
             const needed = recipeItem.quantity * item.quantity;
-            if (ing.stock < needed) {
+            if (DESCONTAR_INVENTARIO && ing.stock < needed) {
               await session.abortTransaction();
               return res.status(400).json({
                 message: `Stock insuficiente de "${ing.name}" para "${dish.name}" (necesario: ${needed}, disponible: ${ing.stock})`
@@ -183,9 +191,13 @@ exports.create = async (req, res, next) => {
       }
     }
 
+    // Todo pedido con mesa (incluido Para llevar) trabaja post-pago:
+    // queda pendiente hasta el cobro. Solo mostrador sin mesa cobra de inmediato.
+    // Excepción explícita: pagoInmediato=true cobra al crear sin ocupar mesa.
     const settings = await Settings.getSettings();
+    const pagoInmediato = req.body.pagoInmediato === true;
     let status = 'pagada';
-    if (settings.paymentMode === 'post-pago' && hasTable) {
+    if (hasTable && !pagoInmediato) {
       status = 'pendiente';
     }
 
@@ -201,6 +213,18 @@ exports.create = async (req, res, next) => {
     }], { session });
 
     const createdSale = sale[0];
+
+    // Cobro inmediato: como nadie pasará por pay(), se descuenta aquí
+    // (solo si el interruptor está activo).
+    if (pagoInmediato && status === 'pagada' && DESCONTAR_INVENTARIO && !createdSale.stockDeducted) {
+      const stockError = await deductSaleStock(createdSale, req.user._id, session, eventsToEmit, alertsToCreate);
+      if (stockError) {
+        await session.abortTransaction();
+        return res.status(400).json({ message: stockError });
+      }
+      createdSale.stockDeducted = true;
+      await createdSale.save({ session });
+    }
 
     // Solo se ocupa la mesa si la venta queda abierta (pendiente).
     // Una venta de cobro inmediato (pagada) no debe ocupar mesa.
@@ -343,7 +367,7 @@ exports.addItems = async (req, res, next) => {
     for (const item of items) {
       const product = await Product.findById(item.product).session(session);
       if (product) {
-        if (product.stock < item.quantity) {
+        if (DESCONTAR_INVENTARIO && product.stock < item.quantity) {
           await session.abortTransaction();
           return res.status(400).json({
             message: `Stock insuficiente para "${product.name}" (disponible: ${product.stock})`
@@ -374,7 +398,7 @@ exports.addItems = async (req, res, next) => {
           const ing = recipeItem.ingredient;
           if (ing) {
             const needed = recipeItem.quantity * item.quantity;
-            if (ing.stock < needed) {
+            if (DESCONTAR_INVENTARIO && ing.stock < needed) {
               await session.abortTransaction();
               return res.status(400).json({
                 message: `Stock insuficiente de "${ing.name}" para "${dish.name}" (necesario: ${needed}, disponible: ${ing.stock})`
@@ -496,11 +520,11 @@ exports.pay = async (req, res, next) => {
       return res.status(400).json({ message: 'Esta venta está anulada y no se puede cobrar' });
     }
 
-    // Al concretarse la compra con el cobro se descuenta el inventario.
-    // Si la venta ya lo tenía descontado (ventas anteriores al cambio), no se repite.
+    // Al concretarse la compra con el cobro se descuenta el inventario
+    // (solo si el interruptor está activo; si no, la venta fluye sin stock).
     const eventsToEmit = [];
     const alertsToCreate = [];
-    if (!sale.stockDeducted) {
+    if (!sale.stockDeducted && DESCONTAR_INVENTARIO) {
       const stockError = await deductSaleStock(sale, req.user._id, session, eventsToEmit, alertsToCreate);
       if (stockError) {
         await session.abortTransaction();

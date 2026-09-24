@@ -39,4 +39,12 @@ describe('runBootSeeds', () => {
     const r2 = await runBootSeeds(silent);
     expect(r2.ran).toBe(false);
   });
+
+  it('should migrate old pre-pago settings to post-pago', async () => {
+    await Settings.create({ paymentMode: 'pre-pago' });
+    await runBootSeeds(silent);
+    const settings = await Settings.findOne({});
+    expect(settings.paymentMode).toBe('post-pago');
+    expect(settings.seedVersion).toBe(CURRENT_SEED_VERSION);
+  });
 });

@@ -6,7 +6,7 @@ const settingsSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   address: { type: String, default: 'Carrera 5 # 16-11, Miraflores' },
   whatsappNumber: { type: String, default: '' },
-  paymentMode: { type: String, enum: ['pre-pago', 'post-pago'], default: 'pre-pago' },
+  paymentMode: { type: String, enum: ['pre-pago', 'post-pago'], default: 'post-pago' },
   // Versión de seeds/datos auto-ejecutados al arrancar (runBootSeeds). Solo avanza.
   seedVersion: { type: Number, default: 0 },
   theme: {
