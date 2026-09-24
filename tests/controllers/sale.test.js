@@ -11,6 +11,7 @@ const Sale = require('../../src/models/Sale');
 const Alert = require('../../src/models/Alert');
 const Table = require('../../src/models/Table');
 const KitchenOrder = require('../../src/models/KitchenOrder');
+const saleCtrl = require('../../src/controllers/sale.controller');
 
 let app, adminToken, admin, category, supplier, product, ingredient, dish;
 
@@ -23,6 +24,7 @@ beforeAll(async () => {
 afterAll(async () => { await closeDB(); });
 beforeEach(async () => {
   await clearDB();
+  saleCtrl.setDescontarInventario(true);
   admin = await User.create({ name: 'Admin', email: 'a@test.com', passwordHash: 'Pass123!', role: 'admin' });
   adminToken = require('jsonwebtoken').sign({ id: admin._id }, process.env.JWT_SECRET);
   category = await createTestCategory();
@@ -40,6 +42,35 @@ describe('Sale Controller', () => {
     expect(res.body.stockDeducted).toBe(false);
     const updated = await Product.findById(product._id);
     expect(updated.stock).toBe(50);
+  });
+
+  it('should create pending sale with table even without post-pago settings (todo es post-pago)', async () => {
+    const Settings = require('../../src/models/Settings');
+    await Settings.create({ paymentMode: 'pre-pago' });
+    await Settings.create({ paymentMode: 'pre-pago' });
+    await Table.create({ number: 6, status: 'libre' });
+    const res = await request(app).post('/api/sales').set('Authorization', `Bearer ${adminToken}`).send({
+      items: [{ product: product._id, quantity: 1 }],
+      tableNumber: 6
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('pendiente');
+    const table = await Table.findOne({ number: 6 });
+    expect(table.status).toBe('ocupada');
+  });
+
+  it('should create paid sale without occupying table when pagoInmediato', async () => {
+    await Table.create({ number: 9, status: 'libre' });
+    const res = await request(app).post('/api/sales').set('Authorization', `Bearer ${adminToken}`).send({
+      items: [{ product: product._id, quantity: 1 }],
+      tableNumber: 9,
+      pagoInmediato: true
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('pagada');
+    const table = await Table.findOne({ number: 9 });
+    expect(table.status).toBe('libre');
+    expect(table.currentSale).toBeNull();
   });
 
   it('should create KitchenOrder when sale has tableNumber', async () => {
@@ -135,6 +166,20 @@ describe('Sale Controller', () => {
       const freed = await Table.findById(table._id);
       expect(freed.status).toBe('libre');
       expect(freed.currentSale).toBeNull();
+    });
+  });
+
+  describe('inventario desactivado (modo actual)', () => {
+    it('should create and pay without validating or deducting stock', async () => {
+      saleCtrl.setDescontarInventario(false);
+      const res = await request(app).post('/api/sales').set('Authorization', `Bearer ${adminToken}`).send({ items: [{ product: product._id, quantity: 100 }] });
+      expect(res.status).toBe(201);
+      const sale = await Sale.create({ user: admin._id, status: 'pendiente', items: [{ product: product._id, productName: 'Test Product', quantity: 100, unitPrice: 2500, subtotal: 250000 }], total: 250000 });
+      const pay = await request(app).post(`/api/sales/${sale._id}/pay`).set('Authorization', `Bearer ${adminToken}`).send({});
+      expect(pay.status).toBe(200);
+      const updated = await Product.findById(product._id);
+      expect(updated.stock).toBe(50);
+      saleCtrl.setDescontarInventario(true);
     });
   });
 

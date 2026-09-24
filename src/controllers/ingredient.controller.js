@@ -17,7 +17,17 @@ async function recordMovement(document, type, quantity, previousStock, newStock,
 
 exports.getAll = async (req, res, next) => {
   try {
-    const ingredients = await Ingredient.find({ isActive: true }).sort({ name: 1 });
+    // Backfill: asignar área por código a insumos creados antes de este campo.
+    // El resto queda en cocina (área por defecto).
+    const sinArea = { $or: [{ area: { $exists: false } }, { area: null }, { area: '' }] };
+    await Ingredient.updateMany({ ...sinArea, code: /^(BB|BI|BP)-/ }, { $set: { area: 'barra' } });
+    await Ingredient.updateMany({ ...sinArea, code: /^S-/ }, { $set: { area: 'servicio' } });
+    await Ingredient.updateMany(sinArea, { $set: { area: 'cocina' } });
+    const filter = { isActive: true };
+    if (req.query.area && ['cocina', 'barra', 'servicio'].includes(req.query.area)) {
+      filter.area = req.query.area;
+    }
+    const ingredients = await Ingredient.find(filter).sort({ name: 1 });
     res.json(ingredients);
   } catch (error) {
     next(error);

@@ -181,3 +181,26 @@ describe('Ingredient Controller - Dishes Using Ingredient', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Ingredient Controller - Areas', () => {
+  it('should filter ingredients by area', async () => {
+    await Ingredient.create({ name: 'Pisco', unit: 'botella', stock: 5, minStock: 2, cost: 30000, area: 'barra' });
+    const res = await request(app)
+      .get('/api/ingredients?area=barra')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].name).toBe('Pisco');
+  });
+
+  it('should backfill area by code on list', async () => {
+    await Ingredient.collection.insertOne({ name: 'Vino', unit: 'botella', stock: 5, minStock: 2, cost: 20000, code: 'BB-099', isActive: true });
+    const res = await request(app)
+      .get('/api/ingredients?area=barra')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.some((i) => i.code === 'BB-099')).toBe(true);
+  });
+});

@@ -7,6 +7,7 @@ const dishIngredientSchema = new mongoose.Schema({
 
 const dishSchema = new mongoose.Schema({
   name: { type: String, required: [true, 'El nombre del plato es requerido'], trim: true },
+  code: { type: String, unique: true, sparse: true, trim: true },
   category: { type: String, required: true, default: 'Platos fuertes' },
   price: { type: Number, required: true, min: 0 },
   description: { type: String, default: '' },
