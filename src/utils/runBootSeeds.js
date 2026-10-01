@@ -14,8 +14,9 @@ const { seedRecetasData } = require('./seedRecetasDemo');
 const { seedBarraData } = require('./seedBarraDemo');
 const { seedCarta15Data, limpiezaTotalCarta } = require('./seedCarta15');
 const { seedBarraColombiaData } = require('./seedBarraColombia');
+const { seedCostosReferenciaData } = require('./seedCostosReferencia');
 
-const CURRENT_SEED_VERSION = 5;
+const CURRENT_SEED_VERSION = 6;
 
 async function backfillStockDeducted(log) {
   // Ventas pendientes creadas con el código anterior YA descontaron stock
@@ -46,6 +47,7 @@ const PASOS = [
   { version: 4, nombre: 'seed-barra-colombia', fn: seedBarraColombiaData },
   // v5: la limpieza total del PR #7 quedó con versión 4 y nunca se ejecutó en prod.
   { version: 5, nombre: 'limpieza-total-carta', fn: limpiezaTotalCarta },
+  { version: 6, nombre: 'costos-referencia', fn: seedCostosReferenciaData },
 ];
 
 async function runBootSeeds(log) {
