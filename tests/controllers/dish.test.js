@@ -132,4 +132,44 @@ describe('Dish Controller', () => {
     expect(res.body[0].available).toBe(false);
     expect(res.body[0].missing[0].deficit).toBe(1);
   });
+
+  it('should store uploaded photo as data-URL in Mongo (no disk)', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const res = await request(app).post('/api/dishes')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .field('name', 'Con foto')
+      .field('category', 'Entradas')
+      .field('price', '15000')
+      .field('ingredients', JSON.stringify([{ ingredient: ingredient._id.toString(), quantity: 1 }]))
+      .attach('photo', png, { filename: 'foto con ñandú.jpg', contentType: 'image/png' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.imageUrl.startsWith('data:image/png;base64,')).toBe(true);
+    const guardado = await Dish.findById(res.body._id);
+    expect(guardado.imageUrl.startsWith('data:image/png;base64,')).toBe(true);
+  });
+
+  it('should update photo on edit without touching other fields', async () => {
+    const dish = await Dish.create({ name: 'Sin foto', category: 'Sopas', price: 10000, imageUrl: '/uploads/vieja.jpg' });
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const res = await request(app).put(`/api/dishes/${dish._id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .field('name', 'Sin foto')
+      .attach('photo', png, { filename: 'nueva.png', contentType: 'image/png' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.imageUrl.startsWith('data:image/png;base64,')).toBe(true);
+    expect(res.body.name).toBe('Sin foto');
+  });
+
+  it('should reject non-image uploads', async () => {
+    const res = await request(app).post('/api/dishes')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .field('name', 'Malo')
+      .field('category', 'Sopas')
+      .field('price', '10000')
+      .attach('photo', Buffer.from('hola'), { filename: 'x.txt', contentType: 'text/plain' });
+
+    expect(res.status).not.toBe(201);
+  });
 });

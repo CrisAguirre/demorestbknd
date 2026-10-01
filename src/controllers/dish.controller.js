@@ -28,7 +28,7 @@ exports.create = async (req, res, next) => {
         }
       }
     }
-    if (req.file) body.imageUrl = `/uploads/${req.file.filename}`;
+    if (req.file) body.imageUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     const dish = await Dish.create(body);
     const populated = await dish.populate('ingredients.ingredient');
     res.status(201).json(populated);
@@ -52,7 +52,7 @@ exports.update = async (req, res, next) => {
         }
       }
     }
-    if (req.file) body.imageUrl = `/uploads/${req.file.filename}`;
+    if (req.file) body.imageUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     const dish = await Dish.findByIdAndUpdate(req.params.id, body, {
       new: true, runValidators: true
     }).populate('ingredients.ingredient');
