@@ -250,7 +250,9 @@ async function seedCarta15Data() {
     console.log(`🍲 Plato ${p.code} ${p.name} verificado (${receta.length} insumos)`);
   }
 
-  const fuera = await Dish.deleteMany({ code: { $nin: NUEVOS, $ne: null } });
+  // Limpieza total de carta vieja: elimina TODO plato fuera de C1..C15,
+  // incluidos los manuales sin código. Solo sobrevive la carta nueva.
+  const fuera = await Dish.deleteMany({ $or: [{ code: { $nin: NUEVOS } }, { code: { $exists: false } }] });
   console.log(`🧹 Carta vieja eliminada: ${fuera.deletedCount || 0} plato(s) con código fuera de C1..C15`);
 
   console.log('\n✅ Seed carta 15 completado (upsert + limpieza de carta vieja)');
