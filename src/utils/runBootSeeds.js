@@ -13,8 +13,9 @@ const Sale = require('../models/Sale');
 const { seedRecetasData } = require('./seedRecetasDemo');
 const { seedBarraData } = require('./seedBarraDemo');
 const { seedCarta15Data } = require('./seedCarta15');
+const { seedBarraColombiaData } = require('./seedBarraColombia');
 
-const CURRENT_SEED_VERSION = 3;
+const CURRENT_SEED_VERSION = 4;
 
 async function backfillStockDeducted(log) {
   // Ventas pendientes creadas con el código anterior YA descontaron stock
@@ -42,6 +43,7 @@ const PASOS = [
   { version: 2, nombre: 'migrar-post-pago', fn: migrarPostPago },
   // seed-carta-15 incluye deleteMany ACOTADO a códigos fuera de C1..C15 (carta vieja, orden explícita).
   { version: 3, nombre: 'seed-carta-15', fn: seedCarta15Data },
+  { version: 4, nombre: 'seed-barra-colombia', fn: seedBarraColombiaData },
 ];
 
 async function runBootSeeds(log) {
