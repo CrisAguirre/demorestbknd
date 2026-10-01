@@ -7,8 +7,10 @@ exports.create = async (req, res, next) => {
 
     const tableDoc = await Table.findById(table);
     if (!tableDoc) return res.status(404).json({ message: 'Mesa no encontrada' });
-    if (tableDoc.status !== 'libre') {
-      return res.status(400).json({ message: 'La mesa no está libre' });
+    // Se permiten varias reservas activas por mesa (distintas horas/fechas).
+    // Solo se bloquea si la mesa está ocupada con venta en curso.
+    if (tableDoc.status === 'ocupada') {
+      return res.status(400).json({ message: 'La mesa está ocupada con una venta en curso' });
     }
 
     const reservation = await Reservation.create({
@@ -21,7 +23,16 @@ exports.create = async (req, res, next) => {
     });
 
     tableDoc.status = 'reservada';
-    tableDoc.currentReservation = reservation._id;
+    // currentReservation apunta a la próxima reserva (la más cercana); si ya hay una, se conserva.
+    if (!tableDoc.currentReservation) {
+      tableDoc.currentReservation = reservation._id;
+    } else {
+      const actual = await Reservation.findById(tableDoc.currentReservation);
+      const activa = actual && (actual.status === 'pendiente' || actual.status === 'confirmada');
+      if (!activa || new Date(actual.date) > new Date(reservation.date)) {
+        tableDoc.currentReservation = reservation._id;
+      }
+    }
     await tableDoc.save();
 
     res.status(201).json(reservation);
@@ -75,11 +86,24 @@ exports.cancel = async (req, res, next) => {
     reservation.status = 'cancelada';
     await reservation.save();
 
-    // Free the table
-    await Table.findByIdAndUpdate(reservation.table, {
-      status: 'libre',
-      currentReservation: null
-    });
+    // Libera la mesa solo si no quedan más reservas activas; si quedan,
+    // apunta currentReservation a la próxima.
+    const otra = await Reservation.findOne({
+      table: reservation.table,
+      status: { $in: ['pendiente', 'confirmada'] },
+      _id: { $ne: reservation._id }
+    }).sort({ date: 1 });
+    if (otra) {
+      await Table.findByIdAndUpdate(reservation.table, {
+        status: 'reservada',
+        currentReservation: otra._id
+      });
+    } else {
+      await Table.findByIdAndUpdate(reservation.table, {
+        status: 'libre',
+        currentReservation: null
+      });
+    }
 
     res.json(reservation);
   } catch (error) {
