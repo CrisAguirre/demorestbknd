@@ -27,9 +27,10 @@ exports.financialSummary = async (req, res, next) => {
     // Ingresos por eventos
     const events = await Event.find({ 'payments.date': { $gte: startDate } });
     let eventRevenue = 0;
+    let eventPaymentsCount = 0;
     events.forEach(ev => {
       ev.payments.forEach(p => {
-        if (p.date >= startDate) eventRevenue += p.amount;
+        if (p.date >= startDate) { eventRevenue += p.amount; eventPaymentsCount += 1; }
       });
     });
 
@@ -86,11 +87,20 @@ exports.financialSummary = async (req, res, next) => {
       { $sort: { _id: 1 } }
     ]);
 
+    const dailyEvents = await Event.aggregate([
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': { $gte: startDate } } },
+      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } }, revenue: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } }
+    ]);
+
     res.json({
       period,
       startDate,
       // P&L
       totalRevenue,
+      saleRevenue,
+      eventRevenue,
       cogs,
       grossProfit,
       grossMargin: Number(grossMargin),
@@ -102,9 +112,11 @@ exports.financialSummary = async (req, res, next) => {
       // Desglose
       expenseByCategory,
       salesCount: sales.length,
+      eventPaymentsCount,
       purchasesCount: purchases.length,
       // Tendencias
       dailySales,
+      dailyEvents,
       dailyExpenses,
       dailyPurchases
     });
@@ -118,10 +130,15 @@ exports.cashFlow = async (req, res, next) => {
     const { period = 'month' } = req.query;
     const startDate = getRange(period);
 
-    const [salesData, purchasesData, expensesData] = await Promise.all([
+    const [salesData, eventsData, purchasesData, expensesData] = await Promise.all([
       Sale.aggregate([
         { $match: { createdAt: { $gte: startDate }, status: { $ne: 'cancelada' } } },
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, inflow: { $sum: '$total' } } }
+      ]),
+      Event.aggregate([
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: startDate } } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } }, inflow: { $sum: '$payments.amount' } } }
       ]),
       Purchase.aggregate([
         { $match: { createdAt: { $gte: startDate }, status: { $ne: 'anulada' } } },
@@ -137,6 +154,10 @@ exports.cashFlow = async (req, res, next) => {
     const dayMap = {};
     salesData.forEach(d => {
       dayMap[d._id] = { date: d._id, inflow: d.inflow, outflow: 0 };
+    });
+    eventsData.forEach(d => {
+      if (!dayMap[d._id]) dayMap[d._id] = { date: d._id, inflow: 0, outflow: 0 };
+      dayMap[d._id].inflow += d.inflow;
     });
     purchasesData.forEach(d => {
       if (!dayMap[d._id]) dayMap[d._id] = { date: d._id, inflow: 0, outflow: 0 };
@@ -156,6 +177,53 @@ exports.cashFlow = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ── 4. Historial de ingresos (ventas + pagos de eventos) ─────────────────────
+// GET /api/finance/income-history?from=2026-01-01&to=2026-12-31&limit=100
+exports.incomeHistory = async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 100, 500);
+    const from = req.query.from ? new Date(req.query.from) : new Date(1970, 0, 1);
+    const to = req.query.to ? new Date(req.query.to) : new Date();
+    to.setHours(23, 59, 59, 999);
+
+    const sales = await Sale.find({
+      createdAt: { $gte: from, $lte: to },
+      status: { $ne: 'cancelada' }
+    }).select('createdAt total paymentMethod status customerName').lean();
+
+    const events = await Event.find({ 'payments.date': { $gte: from, $lte: to } })
+      .select('customerName theme eventType payments').lean();
+
+    const rows = sales.map(s => ({
+      tipo: 'venta',
+      fecha: s.createdAt,
+      referencia: s.customerName || 'Venta mostrador',
+      detalle: `Estado: ${s.status}`,
+      monto: s.total,
+      metodo: s.paymentMethod || ''
+    }));
+
+    events.forEach(ev => {
+      (ev.payments || []).forEach(p => {
+        if (p.date < from || p.date > to) return;
+        rows.push({
+          tipo: ev.eventType === 'catering_externo' ? 'catering' : 'evento',
+          fecha: p.date,
+          referencia: ev.customerName || '',
+          detalle: ev.theme || '',
+          monto: p.amount,
+          metodo: p.method || ''
+        });
+      });
+    });
+
+    rows.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const total = rows.reduce((s, r) => s + r.monto, 0);
+
+    res.json({ from, to, count: rows.length, total, rows: rows.slice(0, limit) });
+  } catch (err) { next(err); }
+};
+
 // ── 3. Cuenta de Resultados (P&L) por mes ────────────────────────────────────
 // GET /api/finance/monthly-pl?months=6
 exports.monthlyPL = async (req, res, next) => {
@@ -168,7 +236,7 @@ exports.monthlyPL = async (req, res, next) => {
       const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
 
-      const [salesAgg, expAgg, purAgg] = await Promise.all([
+      const [salesAgg, expAgg, purAgg, evtAgg] = await Promise.all([
         Sale.aggregate([
           { $match: { createdAt: { $gte: start, $lte: end }, status: { $ne: 'cancelada' } } },
           { $group: { _id: null, revenue: { $sum: '$total' }, count: { $sum: 1 } } }
@@ -180,10 +248,16 @@ exports.monthlyPL = async (req, res, next) => {
         Purchase.aggregate([
           { $match: { createdAt: { $gte: start, $lte: end }, status: { $ne: 'anulada' } } },
           { $group: { _id: null, total: { $sum: '$total' } } }
+        ]),
+        Event.aggregate([
+          { $unwind: '$payments' },
+          { $match: { 'payments.date': { $gte: start, $lte: end } } },
+          { $group: { _id: null, revenue: { $sum: '$payments.amount' }, count: { $sum: 1 } } }
         ])
       ]);
 
-      const revenue = salesAgg[0]?.revenue || 0;
+      const revenue = (salesAgg[0]?.revenue || 0) + (evtAgg[0]?.revenue || 0);
+      const eventRevenue = evtAgg[0]?.revenue || 0;
       const expenses = expAgg[0]?.total || 0;
       const purchases = purAgg[0]?.total || 0;
       const profit = revenue - expenses - purchases;
@@ -192,6 +266,7 @@ exports.monthlyPL = async (req, res, next) => {
         month: start.toISOString().slice(0, 7),
         label: start.toLocaleString('es-CO', { month: 'short', year: '2-digit' }),
         revenue,
+        eventRevenue,
         expenses,
         purchases,
         profit,

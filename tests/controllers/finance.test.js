@@ -52,4 +52,36 @@ describe('Finance Controller', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(3);
   });
+
+  it('should include event payments in summary, cashflow, monthly-pl and income-history', async () => {
+    const Event = require('../../src/models/Event');
+    await Sale.create({ user: admin._id, items: [{ product: product._id, productName: 'P', quantity: 1, unitPrice: 2000, subtotal: 2000 }], total: 2000 });
+    await Event.create({
+      customerName: 'Cliente Ev', eventType: 'evento_local',
+      eventDate: new Date(), totalCost: 5000,
+      payments: [{ amount: 2000, method: 'efectivo', user: admin._id, date: new Date() }]
+    });
+
+    const sum = await request(app).get('/api/finance/summary').set('Authorization', `Bearer ${adminToken}`);
+    expect(sum.status).toBe(200);
+    expect(sum.body.saleRevenue).toBe(2000);
+    expect(sum.body.eventRevenue).toBe(2000);
+    expect(sum.body.totalRevenue).toBe(4000);
+    expect(sum.body.eventPaymentsCount).toBe(1);
+
+    const flow = await request(app).get('/api/finance/cashflow').set('Authorization', `Bearer ${adminToken}`);
+    expect(flow.status).toBe(200);
+    expect(flow.body.find(d => d.inflow >= 4000)).toBeTruthy();
+
+    const pl = await request(app).get('/api/finance/monthly-pl').query({ months: 1 }).set('Authorization', `Bearer ${adminToken}`);
+    expect(pl.status).toBe(200);
+    expect(pl.body[0].eventRevenue).toBe(2000);
+    expect(pl.body[0].revenue).toBe(4000);
+
+    const hist = await request(app).get('/api/finance/income-history').set('Authorization', `Bearer ${adminToken}`);
+    expect(hist.status).toBe(200);
+    expect(hist.body.count).toBe(2);
+    expect(hist.body.total).toBe(4000);
+    expect(hist.body.rows.map(r => r.tipo).sort()).toEqual(['evento', 'venta']);
+  });
 });

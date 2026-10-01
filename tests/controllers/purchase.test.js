@@ -42,4 +42,37 @@ describe('Purchase Controller', () => {
     const updated = await Product.findById(product._id);
     expect(updated.stock).toBe(10);
   });
+
+  it('should create requisition pending without moving stock, and add on receive', async () => {
+    const Ingredient = require('../../src/models/Ingredient');
+    const ing = await Ingredient.create({ code: 'CF-099', name: 'Prueba', unit: 'g', stock: 5 });
+    const res = await request(app).post('/api/purchases').set('Authorization', `Bearer ${adminToken}`).send({
+      origen: 'requisicion', area: 'cocina', status: 'pendiente',
+      items: [{ itemType: 'ingredient', itemCode: 'CF-099', quantity: 10, unitCost: 0 }]
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('pendiente');
+    expect(res.body.origen).toBe('requisicion');
+    expect((await Ingredient.findById(ing._id)).stock).toBe(5);
+
+    const rec = await request(app).patch(`/api/purchases/${res.body._id}/status`).set('Authorization', `Bearer ${adminToken}`).send({ status: 'recibida' });
+    expect(rec.status).toBe(200);
+    expect((await Ingredient.findById(ing._id)).stock).toBe(15);
+  });
+
+  it('should upsert unknown ingredient codes from requisitions', async () => {
+    const Ingredient = require('../../src/models/Ingredient');
+    const res = await request(app).post('/api/purchases').set('Authorization', `Bearer ${adminToken}`).send({
+      origen: 'requisicion', area: 'barra', status: 'pendiente',
+      items: [{ itemType: 'ingredient', itemCode: 'XX-001', itemName: 'Nuevo Insumo', unit: 'g', quantity: 3, unitCost: 0 }]
+    });
+    expect(res.status).toBe(201);
+    expect(await Ingredient.findOne({ code: 'XX-001' })).toBeTruthy();
+  });
+
+  it('should not allow recibida back to pendiente', async () => {
+    const purchase = await Purchase.create({ user: admin._id, items: [{ itemType: 'product', product: product._id, itemName: 'P', quantity: 1, unitCost: 100, subtotal: 100 }], total: 100, status: 'recibida' });
+    const res = await request(app).patch(`/api/purchases/${purchase._id}/status`).set('Authorization', `Bearer ${adminToken}`).send({ status: 'pendiente' });
+    expect(res.status).toBe(400);
+  });
 });

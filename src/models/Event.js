@@ -3,9 +3,19 @@ const mongoose = require('mongoose');
 const paymentSchema = new mongoose.Schema({
   amount: { type: Number, required: true, min: 0 },
   method: { type: String, enum: ['efectivo', 'transferencia', 'mixto'], default: 'efectivo' },
+  milestone: { type: mongoose.Schema.Types.ObjectId, default: null },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   date: { type: Date, default: Date.now }
 }, { _id: true });
+
+// Hitos de pago manuales (ej. anticipo acordado, saldo): sin plantilla,
+// el restaurante define etiqueta, monto y vencimiento por evento.
+const milestoneSchema = new mongoose.Schema({
+  etiqueta: { type: String, required: [true, 'La etiqueta del hito es requerida'], trim: true },
+  monto: { type: Number, required: true, min: 0.01 },
+  vencimiento: { type: Date, default: null },
+  estado: { type: String, enum: ['pendiente', 'parcial', 'pagado'], default: 'pendiente' }
+}, { _id: true, timestamps: true });
 
 const eventSchema = new mongoose.Schema({
   customerName: { type: String, required: true },
@@ -27,6 +37,7 @@ const eventSchema = new mongoose.Schema({
   status: { type: String, enum: ['pendiente', 'confirmado', 'realizado', 'cancelado'], default: 'pendiente' },
   totalCost: { type: Number, required: true, min: 0 },
   payments: [paymentSchema],
+  milestones: [milestoneSchema],
   notes: { type: String, default: '' }
 }, { timestamps: true });
 

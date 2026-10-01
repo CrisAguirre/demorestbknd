@@ -27,6 +27,10 @@ const purchaseSchema = new mongoose.Schema({
   invoiceNumber:  { type: String, default: '' },
   paymentMethod:  { type: String, enum: ['efectivo', 'transferencia', 'credito', 'mixto'], default: 'efectivo' },
   status:         { type: String, enum: ['pendiente', 'recibida', 'anulada'], default: 'recibida' },
+  // Origen: compra directa del admin o requisición enviada por un área (cocina/barra/servicio).
+  // Las requisiciones nacen 'pendiente' (sin mover stock) y suman al recibirse.
+  origen:         { type: String, enum: ['compra', 'requisicion'], default: 'compra' },
+  area:           { type: String, default: '' },
   notes:          { type: String, default: '' }
 }, { timestamps: true });
 
