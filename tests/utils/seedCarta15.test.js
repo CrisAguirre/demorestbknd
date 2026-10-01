@@ -1,5 +1,5 @@
 const { connectDB, closeDB, clearDB } = require('../helpers');
-const { seedCarta15Data } = require('../../src/utils/seedCarta15');
+const { seedCarta15Data, limpiezaTotalCarta } = require('../../src/utils/seedCarta15');
 const Dish = require('../../src/models/Dish');
 const Ingredient = require('../../src/models/Ingredient');
 
@@ -38,5 +38,15 @@ describe('seedCarta15', () => {
     const r2 = await seedCarta15Data();
     expect(r2.platos).toBe(15);
     expect(await Dish.countDocuments({ code: /^C\d+$/ })).toBe(15);
+  });
+
+  it('should wipe every non-C dish via limpiezaTotalCarta (v5 step)', async () => {
+    await Dish.create({ code: 'RC-01', name: 'Viejo', category: 'Entradas', price: 0 });
+    await Dish.create({ name: 'Manual sin código', category: 'Sopas', price: 5000 });
+    await Dish.create({ code: 'C1', name: 'Ceviche', category: 'Entradas', price: 28000 });
+    const r = await limpiezaTotalCarta();
+    expect(r.eliminados).toBe(2);
+    expect(await Dish.countDocuments({})).toBe(1);
+    expect(await Dish.findOne({ code: 'C1' })).toBeTruthy();
   });
 });

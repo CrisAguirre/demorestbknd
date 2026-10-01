@@ -12,10 +12,10 @@ const Settings = require('../models/Settings');
 const Sale = require('../models/Sale');
 const { seedRecetasData } = require('./seedRecetasDemo');
 const { seedBarraData } = require('./seedBarraDemo');
-const { seedCarta15Data } = require('./seedCarta15');
+const { seedCarta15Data, limpiezaTotalCarta } = require('./seedCarta15');
 const { seedBarraColombiaData } = require('./seedBarraColombia');
 
-const CURRENT_SEED_VERSION = 4;
+const CURRENT_SEED_VERSION = 5;
 
 async function backfillStockDeducted(log) {
   // Ventas pendientes creadas con el código anterior YA descontaron stock
@@ -44,6 +44,8 @@ const PASOS = [
   // seed-carta-15 incluye deleteMany ACOTADO a códigos fuera de C1..C15 (carta vieja, orden explícita).
   { version: 3, nombre: 'seed-carta-15', fn: seedCarta15Data },
   { version: 4, nombre: 'seed-barra-colombia', fn: seedBarraColombiaData },
+  // v5: la limpieza total del PR #7 quedó con versión 4 y nunca se ejecutó en prod.
+  { version: 5, nombre: 'limpieza-total-carta', fn: limpiezaTotalCarta },
 ];
 
 async function runBootSeeds(log) {

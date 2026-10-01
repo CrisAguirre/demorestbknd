@@ -259,7 +259,15 @@ async function seedCarta15Data() {
   return { ingredientes: ingredientes.length, platos: platos.length, eliminados: fuera.deletedCount || 0 };
 }
 
-module.exports = { seedCarta15Data };
+// Limpieza total standalone (paso v5 de boot-seeds): elimina TODO plato
+// fuera de C1..C15, incluidos manuales sin código. Solo sobrevive la carta nueva.
+async function limpiezaTotalCarta() {
+  const fuera = await Dish.deleteMany({ $or: [{ code: { $nin: NUEVOS } }, { code: { $exists: false } }] });
+  console.log(`🧹 Limpieza total carta: ${fuera.deletedCount || 0} plato(s) viejo(s) eliminado(s)`);
+  return { eliminados: fuera.deletedCount || 0 };
+}
+
+module.exports = { seedCarta15Data, limpiezaTotalCarta };
 
 // CLI: node src/utils/seedCarta15.js (requiere .env con MONGODB_URI)
 if (require.main === module) {
