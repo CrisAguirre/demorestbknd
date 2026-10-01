@@ -15,9 +15,9 @@ describe('seedCarta15', () => {
     const r = await seedCarta15Data();
 
     expect(r.platos).toBe(15);
-    expect(r.eliminados).toBe(1);
+    expect(r.eliminados).toBe(2);
     expect(await Dish.findOne({ code: 'RC-01' })).toBeNull();
-    expect(await Dish.findOne({ name: 'Plato manual sin código' })).toBeTruthy();
+    expect(await Dish.findOne({ name: 'Plato manual sin código' })).toBeNull();
 
     const c1 = await Dish.findOne({ code: 'C1' }).populate('ingredients.ingredient');
     expect(c1).toBeTruthy();
