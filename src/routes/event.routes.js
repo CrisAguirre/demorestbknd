@@ -9,5 +9,7 @@ router.post('/', authMiddleware, role('admin', 'cajero'), ctrl.create);
 router.put('/:id', authMiddleware, role('admin', 'cajero'), ctrl.update);
 router.delete('/:id', authMiddleware, role('admin'), ctrl.delete);
 router.post('/:id/payment', authMiddleware, role('admin', 'cajero'), ctrl.addPayment);
+router.post('/:id/milestones', authMiddleware, role('admin', 'cajero'), ctrl.addMilestone);
+router.delete('/:id/milestones/:mid', authMiddleware, role('admin', 'cajero'), ctrl.removeMilestone);
 
 module.exports = router;

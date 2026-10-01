@@ -7,5 +7,6 @@ const role = require('../middleware/role.middleware');
 router.get('/summary', auth, role('admin'), ctrl.financialSummary);
 router.get('/cashflow', auth, role('admin'), ctrl.cashFlow);
 router.get('/monthly-pl', auth, role('admin'), ctrl.monthlyPL);
+router.get('/income-history', auth, role('admin'), ctrl.incomeHistory);
 
 module.exports = router;

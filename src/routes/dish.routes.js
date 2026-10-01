@@ -5,12 +5,10 @@ const ctrl = require('../controllers/dish.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 const role = require('../middleware/role.middleware');
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
-});
+// Fotos en memoria: se guardan como data-URL en Mongo (base64).
+// El disco de Render es efímero y borraba /uploads/ en cada reinicio (404).
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = /jpeg|jpg|png|webp/;

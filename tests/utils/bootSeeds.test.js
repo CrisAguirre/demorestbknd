@@ -30,8 +30,10 @@ describe('runBootSeeds', () => {
     const r = await runBootSeeds(silent);
     expect(r.ran).toBe(true);
     expect(await Ingredient.countDocuments({ code: 'BB-001' })).toBe(1);
-    expect(await Dish.countDocuments({ code: 'RC-01' })).toBe(1);
-    expect(await Dish.countDocuments({ code: 'RP-01' })).toBe(1);
+    // v3 (carta 15) reemplaza el demo: RC-01/RP-01 se eliminan, entran C1..C15
+    expect(await Dish.countDocuments({ code: 'RC-01' })).toBe(0);
+    expect(await Dish.countDocuments({ code: 'C1' })).toBe(1);
+    expect(await Dish.countDocuments({ code: /^C\d+$/ })).toBe(15);
   });
 
   it('should be a no-op on second run', async () => {

@@ -7,10 +7,11 @@ const Supplier   = require('../models/Supplier');
 // GET /api/purchases  (paginado + filtros)
 exports.getAll = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, supplier, status, from, to } = req.query;
+    const { page = 1, limit = 20, supplier, status, origen, from, to } = req.query;
     const filter = {};
     if (supplier) filter.supplier = supplier;
     if (status)   filter.status   = status;
+    if (origen)   filter.origen   = origen;
     if (from || to) {
       filter.createdAt = {};
       if (from) filter.createdAt.$gte = new Date(from);
@@ -45,16 +46,27 @@ exports.getOne = async (req, res, next) => {
 };
 
 // POST /api/purchases  — crea compra mixta (productos e insumos) y actualiza stock
+// status 'pendiente' (requisiciones): NO mueve stock hasta recibirse.
+// Los ítems pueden venir por itemId o por itemCode (código de insumo/producto);
+// con origen 'requisicion' un código inexistente crea el insumo (upsert).
 exports.create = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { supplierId, supplierName, items, invoiceNumber, paymentMethod, notes } = req.body;
+    const { supplierId, supplierName, items, invoiceNumber, paymentMethod, notes, origen, area } = req.body;
+    let { status } = req.body;
 
     if (!items || items.length === 0) {
       await session.abortTransaction();
       return res.status(400).json({ message: 'La compra debe tener al menos un ítem.' });
     }
+    if (status && !['pendiente', 'recibida'].includes(status)) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: `Estado inválido: '${status}'.` });
+    }
+    status = status || 'recibida';
+    const esRequisicion = origen === 'requisicion';
+    const mueveStock = status === 'recibida';
 
     // Resolver proveedor (opcional)
     let resolvedSupplierId   = null;
@@ -76,16 +88,46 @@ exports.create = async (req, res, next) => {
       const subtotal = (item.quantity || 0) * (item.unitCost || 0);
       total += subtotal;
 
+      // Resolver por itemId o por itemCode
+      if (!item.itemId && item.itemCode) {
+        if (item.itemType === 'ingredient') {
+          let ing = await Ingredient.findOne({ code: item.itemCode }).session(session);
+          if (!ing && esRequisicion) {
+            [ing] = await Ingredient.create([{
+              code: item.itemCode,
+              name: item.itemName || item.itemCode,
+              unit: item.unit || 'unidades',
+              area: area || 'cocina',
+              stock: 0
+            }], { session });
+          }
+          if (!ing) {
+            await session.abortTransaction();
+            return res.status(404).json({ message: `Insumo '${item.itemCode}' no encontrado.` });
+          }
+          item.itemId = ing._id.toString();
+        } else if (item.itemType === 'product') {
+          const prod = await Product.findOne({ $or: [{ barcode: item.itemCode }, { name: item.itemCode }] }).session(session);
+          if (!prod) {
+            await session.abortTransaction();
+            return res.status(404).json({ message: `Producto '${item.itemCode}' no encontrado.` });
+          }
+          item.itemId = prod._id.toString();
+        }
+      }
+
       if (item.itemType === 'product') {
         const product = await Product.findById(item.itemId).session(session);
         if (!product) {
           await session.abortTransaction();
           return res.status(404).json({ message: `Producto '${item.itemId}' no encontrado.` });
         }
-        // Actualizar stock (nunca negativo)
-        product.stock = (product.stock || 0) + item.quantity;
-        if (item.updateCost && item.unitCost > 0) product.purchasePrice = item.unitCost;
-        await product.save({ session });
+        // Actualizar stock solo al recibir (nunca negativo en creación)
+        if (mueveStock) {
+          product.stock = (product.stock || 0) + item.quantity;
+          if (item.updateCost && item.unitCost > 0) product.purchasePrice = item.unitCost;
+          await product.save({ session });
+        }
 
         purchaseItems.push({
           itemType:   'product',
@@ -104,9 +146,11 @@ exports.create = async (req, res, next) => {
           await session.abortTransaction();
           return res.status(404).json({ message: `Insumo '${item.itemId}' no encontrado.` });
         }
-        ingredient.stock = (ingredient.stock || 0) + item.quantity;
-        if (item.updateCost && item.unitCost > 0) ingredient.cost = item.unitCost;
-        await ingredient.save({ session });
+        if (mueveStock) {
+          ingredient.stock = (ingredient.stock || 0) + item.quantity;
+          if (item.updateCost && item.unitCost > 0) ingredient.cost = item.unitCost;
+          await ingredient.save({ session });
+        }
 
         purchaseItems.push({
           itemType:   'ingredient',
@@ -133,7 +177,9 @@ exports.create = async (req, res, next) => {
       total,
       invoiceNumber: invoiceNumber || '',
       paymentMethod: paymentMethod || 'efectivo',
-      status:        'recibida',
+      status,
+      origen:        esRequisicion ? 'requisicion' : 'compra',
+      area:          area || '',
       notes:         notes || ''
     }], { session });
 
@@ -147,7 +193,10 @@ exports.create = async (req, res, next) => {
   }
 };
 
-// PATCH /api/purchases/:id/status  (anular y revertir stock)
+// PATCH /api/purchases/:id/status
+// - pendiente → recibida: SUMA stock (recepción de requisición/compra)
+// - recibida → anulada: revierte stock
+// - pendiente → anulada: sin movimiento (nunca entró)
 exports.updateStatus = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -162,16 +211,29 @@ exports.updateStatus = async (req, res, next) => {
       await session.abortTransaction();
       return res.status(400).json({ message: 'Esta compra ya está anulada.' });
     }
+    if (purchase.status === 'recibida' && status === 'pendiente') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Una compra recibida no puede volver a pendiente.' });
+    }
 
-    // Si se anula: revertir stock de cada ítem
-    if (status === 'anulada') {
+    const sumar = async (signo) => {
       for (const item of purchase.items) {
         if (item.itemType === 'product' && item.product) {
-          await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.quantity } }, { session });
+          await Product.findByIdAndUpdate(item.product, { $inc: { stock: signo * item.quantity } }, { session });
         } else if (item.itemType === 'ingredient' && item.ingredient) {
-          await Ingredient.findByIdAndUpdate(item.ingredient, { $inc: { stock: -item.quantity } }, { session });
+          await Ingredient.findByIdAndUpdate(item.ingredient, { $inc: { stock: signo * item.quantity } }, { session });
         }
       }
+    };
+
+    // Si se recibe una requisición/compra pendiente: suma stock
+    if (purchase.status === 'pendiente' && status === 'recibida') {
+      await sumar(1);
+    }
+
+    // Si se anula una recibida: revertir stock de cada ítem
+    if (purchase.status === 'recibida' && status === 'anulada') {
+      await sumar(-1);
     }
 
     purchase.status = status;
