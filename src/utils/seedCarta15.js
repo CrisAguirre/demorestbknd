@@ -10,6 +10,21 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Ingredient = require('../models/Ingredient');
 const Dish = require('../models/Dish');
+const { rellenarCategorias } = require('./categoriaInsumos');
+
+// Categoría de cocina por prefijo de código (igual que el front para generar códigos).
+const CATEGORIA_COCINA = {
+  CP: 'Proteínas',
+  CF: 'Verduras y frutas',
+  CL: 'Lácteos',
+  CA: 'Abarrotes',
+  BI: 'Abarrotes',
+};
+
+function categoriaPorCodigo(code) {
+  const pref = String(code || '').split('-')[0];
+  return CATEGORIA_COCINA[pref] || '';
+}
 
 const ingredientes = [
   // Ya existentes en el catálogo (se verifican, no se pisan)
@@ -217,12 +232,15 @@ async function seedCarta15Data() {
   for (const ing of ingredientes) {
     const doc = await Ingredient.findOneAndUpdate(
       { code: ing.code },
-      { $setOnInsert: ing },
+      { $setOnInsert: { ...ing, categoria: categoriaPorCodigo(ing.code) } },
       { upsert: true, new: true, runValidators: true }
     );
     mapa[ing.code] = doc._id;
   }
   console.log(`🧅 ${ingredientes.length} ingredientes verificados (sin duplicar)`);
+  await rellenarCategorias(
+    ingredientes.map((ing) => ({ code: ing.code, categoria: categoriaPorCodigo(ing.code) }))
+  );
 
   for (const p of platos) {
     const receta = p.receta
@@ -267,7 +285,68 @@ async function limpiezaTotalCarta() {
   return { eliminados: fuera.deletedCount || 0 };
 }
 
-module.exports = { seedCarta15Data, limpiezaTotalCarta };
+// Reparación NO destructiva (paso v8 de boot-seeds): deja intactas las recetas
+// editadas manualmente (p.ej. porcionado en unidades de 100g) y solo repara lo
+// roto: platos C1..C15 faltantes, con receta vacía o con _id de insumos que ya
+// no existen (borrado + recreado cambia el _id y el cobro deja de descontar
+// sin mostrar error). NO elimina carta vieja ni platos manuales.
+async function repararCarta15Data(log) {
+  const logger = log || console;
+  const mapa = {};
+  for (const ing of ingredientes) {
+    const doc = await Ingredient.findOneAndUpdate(
+      { code: ing.code },
+      { $setOnInsert: { ...ing, categoria: categoriaPorCodigo(ing.code) } },
+      { upsert: true, new: true, runValidators: true }
+    );
+    mapa[ing.code] = doc._id;
+  }
+  await rellenarCategorias(
+    ingredientes.map((ing) => ({ code: ing.code, categoria: categoriaPorCodigo(ing.code) })),
+    logger
+  );
+
+  let creados = 0;
+  let reparados = 0;
+  let intactos = 0;
+  for (const p of platos) {
+    const receta = p.receta
+      .map(([code, quantity]) => ({ ingredient: mapa[code], quantity }))
+      .filter((i) => i.ingredient);
+    const dish = await Dish.findOne({ code: p.code }).populate('ingredients.ingredient');
+    if (!dish) {
+      await Dish.create({
+        code: p.code,
+        name: p.name,
+        category: p.category,
+        price: p.price,
+        description: p.description,
+        preparation: p.preparation,
+        isAvailable: true,
+        ingredients: receta,
+      });
+      creados += 1;
+      logger.log(`🍲 Plato ${p.code} ${p.name} creado (${receta.length} insumos)`);
+    } else if (dish.ingredients.length === 0 || dish.ingredients.some((i) => !i.ingredient)) {
+      dish.ingredients = receta;
+      await dish.save();
+      reparados += 1;
+      logger.log(`🔧 Plato ${p.code} ${p.name} reparado (receta vacía o con insumos inexistentes)`);
+    } else {
+      intactos += 1;
+    }
+  }
+  logger.log(`✅ Reparación carta 15: ${creados} creados, ${reparados} reparados, ${intactos} intactos (ediciones manuales respetadas)`);
+  return { creados, reparados, intactos };
+}
+
+module.exports = {
+  seedCarta15Data,
+  repararCarta15Data,
+  limpiezaTotalCarta,
+  categoriaPorCodigo,
+  categoriasCarta15: ingredientes.map((ing) => ({ code: ing.code, categoria: categoriaPorCodigo(ing.code) })),
+};
 
 // CLI: node src/utils/seedCarta15.js (requiere .env con MONGODB_URI)
 if (require.main === module) {

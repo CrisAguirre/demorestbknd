@@ -7,16 +7,17 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Ingredient = require('../models/Ingredient');
+const { rellenarCategorias } = require('./categoriaInsumos');
 
 const RENOMBRES = [
   { code: 'BB-001', name: 'Ron Viejo de Caldas 750ml' },
 ];
 
 const NUEVOS = [
-  { code: 'BB-015', name: 'Panela para coctelería', unit: 'kg', area: 'barra', ubicacion: 'Barra', stock: 3, minStock: 1, cost: 0 },
-  { code: 'BB-016', name: 'Limón tahití', unit: 'kg', area: 'barra', ubicacion: 'Refrigerador barra', stock: 2, minStock: 1, cost: 0 },
-  { code: 'BB-017', name: 'Lulo', unit: 'kg', area: 'barra', ubicacion: 'Refrigerador barra', stock: 2, minStock: 1, cost: 0 },
-  { code: 'BB-018', name: 'Maracuyá', unit: 'kg', area: 'barra', ubicacion: 'Refrigerador barra', stock: 2, minStock: 1, cost: 0 },
+  { code: 'BB-015', name: 'Panela para coctelería', unit: 'kg', area: 'barra', ubicacion: 'Barra', stock: 3, minStock: 1, cost: 0, categoria: 'Insumos' },
+  { code: 'BB-016', name: 'Limón tahití', unit: 'kg', area: 'barra', ubicacion: 'Refrigerador barra', stock: 2, minStock: 1, cost: 0, categoria: 'Insumos' },
+  { code: 'BB-017', name: 'Lulo', unit: 'kg', area: 'barra', ubicacion: 'Refrigerador barra', stock: 2, minStock: 1, cost: 0, categoria: 'Insumos' },
+  { code: 'BB-018', name: 'Maracuyá', unit: 'kg', area: 'barra', ubicacion: 'Refrigerador barra', stock: 2, minStock: 1, cost: 0, categoria: 'Insumos' },
 ];
 
 async function seedBarraColombiaData() {
@@ -39,10 +40,11 @@ async function seedBarraColombiaData() {
   console.log(`🍹 Barra: ${NUEVOS.length} insumo(s) verificados (sin duplicar)`);
 
   console.log('\n✅ Seed barra colombia completado');
+  await rellenarCategorias(NUEVOS.map((i) => ({ code: i.code, categoria: i.categoria })));
   return { renombres: RENOMBRES.length, nuevos: NUEVOS.length };
 }
 
-module.exports = { seedBarraColombiaData };
+module.exports = { seedBarraColombiaData, categoriasBarraColombia: NUEVOS.map((i) => ({ code: i.code, categoria: i.categoria })) };
 
 // CLI: node src/utils/seedBarraColombia.js (requiere .env con MONGODB_URI)
 if (require.main === module) {

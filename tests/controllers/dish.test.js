@@ -42,6 +42,13 @@ describe('Dish Controller', () => {
     expect(res.status).toBe(400);
   });
 
+  it('should reject deactivated ingredient (borrado en Inventarios)', async () => {
+    await Ingredient.findByIdAndUpdate(ingredient._id, { isActive: false });
+    const res = await request(app).post('/api/dishes').set('Authorization', `Bearer ${adminToken}`).send({ name: 'Bad', category: 'Sopas', price: 10000, ingredients: [{ ingredient: ingredient._id, quantity: 1 }] });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/desactivado/);
+  });
+
   it('should reject non-admin', async () => {
     const cajero = await User.create({ name: 'C', email: 'c@test.com', passwordHash: 'Pass123!', role: 'cajero' });
     const token = require('jsonwebtoken').sign({ id: cajero._id }, process.env.JWT_SECRET);

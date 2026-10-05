@@ -9,6 +9,8 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Ingredient = require('../models/Ingredient');
 const Dish = require('../models/Dish');
+const { rellenarCategorias } = require('./categoriaInsumos');
+const { categoriaPorCodigo } = require('./seedCarta15');
 
 const ingredientes = [
   // Ceviche (cantidades de referencia para stock demo)
@@ -78,12 +80,15 @@ async function seedRecetasData() {
   for (const ing of ingredientes) {
     const doc = await Ingredient.findOneAndUpdate(
       { code: ing.code },
-      { $setOnInsert: ing },
+      { $setOnInsert: { ...ing, categoria: categoriaPorCodigo(ing.code) } },
       { upsert: true, new: true, runValidators: true }
     );
     mapa[ing.code] = doc._id;
   }
   console.log(`🧅 ${ingredientes.length} ingredientes verificados (sin duplicar)`);
+  await rellenarCategorias(
+    ingredientes.map((ing) => ({ code: ing.code, categoria: categoriaPorCodigo(ing.code) }))
+  );
 
   for (const p of platos) {
     await Dish.findOneAndUpdate(
@@ -109,7 +114,10 @@ async function seedRecetasData() {
   return { ingredientes: ingredientes.length, platos: platos.length };
 }
 
-module.exports = { seedRecetasData };
+module.exports = {
+  seedRecetasData,
+  categoriasRecetasDemo: ingredientes.map((ing) => ({ code: ing.code, categoria: categoriaPorCodigo(ing.code) })),
+};
 
 // CLI: node src/utils/seedRecetasDemo.js (requiere .env con MONGODB_URI)
 if (require.main === module) {

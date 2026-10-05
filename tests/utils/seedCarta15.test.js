@@ -40,6 +40,21 @@ describe('seedCarta15', () => {
     expect(await Dish.countDocuments({ code: /^C\d+$/ })).toBe(15);
   });
 
+  it('should assign categoria on create and fill missing without overwriting user edits', async () => {
+    await seedCarta15Data();
+    expect((await Ingredient.findOne({ code: 'CP-001' })).categoria).toBe('Proteínas');
+    expect((await Ingredient.findOne({ code: 'CF-002' })).categoria).toBe('Verduras y frutas');
+    expect((await Ingredient.findOne({ code: 'CL-001' })).categoria).toBe('Lácteos');
+    expect((await Ingredient.findOne({ code: 'CA-001' })).categoria).toBe('Abarrotes');
+
+    // No pisa ediciones del usuario, pero sí rellena donde falta
+    await Ingredient.updateOne({ code: 'CP-001' }, { $set: { categoria: 'Especial' } });
+    await Ingredient.updateOne({ code: 'CA-001' }, { $set: { categoria: '' } });
+    await seedCarta15Data();
+    expect((await Ingredient.findOne({ code: 'CP-001' })).categoria).toBe('Especial');
+    expect((await Ingredient.findOne({ code: 'CA-001' })).categoria).toBe('Abarrotes');
+  });
+
   it('should wipe every non-C dish via limpiezaTotalCarta (v5 step)', async () => {
     await Dish.create({ code: 'RC-01', name: 'Viejo', category: 'Entradas', price: 0 });
     await Dish.create({ name: 'Manual sin código', category: 'Sopas', price: 5000 });

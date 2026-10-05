@@ -11,10 +11,12 @@ const Settings = require('../models/Settings');
 const { emitKitchenEvent, emitDataChange } = require('../services/socketService');
 
 // Interruptor maestro del descuento de inventario.
-// En OFF (actual): las ventas NO validan ni descuentan stock; la mesa
-// siempre se cobra al final. En ON: se valida al registrar y se descuenta
-// al cobrar. Cambiar a true cuando recetas e inventario estén configurados.
-let DESCONTAR_INVENTARIO = false;
+// En ON: las ventas validan disponibilidad al registrar (comandar) y descuentan
+// stock al cobrar (cerrar la venta). Las comandas pendientes NO descuentan y las
+// anuladas/canceladas tampoco (cancel solo admite pendientes). Cada descuento
+// queda en movementHistory del insumo/producto para el control por reportes.
+// En OFF: las ventas fluyen sin tocar stock (modo manual).
+let DESCONTAR_INVENTARIO = true;
 exports.setDescontarInventario = (v) => { DESCONTAR_INVENTARIO = !!v; };
 exports.getDescontarInventario = () => DESCONTAR_INVENTARIO;
 
@@ -150,9 +152,12 @@ exports.create = async (req, res, next) => {
         }
 
         const ingredientsConsumed = [];
+        let nulos = 0;
         for (const recipeItem of dish.ingredients) {
           const ing = recipeItem.ingredient;
-          if (ing) {
+          if (!ing) {
+            nulos += 1;
+          } else {
             const needed = recipeItem.quantity * item.quantity;
             if (DESCONTAR_INVENTARIO && ing.stock < needed) {
               await session.abortTransaction();
@@ -177,6 +182,11 @@ exports.create = async (req, res, next) => {
               unit: ing.unit
             });
           }
+        }
+        if (dish.ingredients.length === 0) {
+          console.warn(`[ventas] plato "${dish.name}" (${dish._id}) vendido sin receta: no descontará insumos al cobrar`);
+        } else if (nulos > 0) {
+          console.warn(`[ventas] plato "${dish.name}" (${dish._id}): ${nulos} insumo(s) con _id inexistente (borrado y recreado sin re-enlazar). Cobro no los descontará.`);
         }
 
         dishItems.push({
@@ -394,9 +404,12 @@ exports.addItems = async (req, res, next) => {
         }
 
         const ingredientsConsumed = [];
+        let nulos = 0;
         for (const recipeItem of dish.ingredients) {
           const ing = recipeItem.ingredient;
-          if (ing) {
+          if (!ing) {
+            nulos += 1;
+          } else {
             const needed = recipeItem.quantity * item.quantity;
             if (DESCONTAR_INVENTARIO && ing.stock < needed) {
               await session.abortTransaction();
@@ -421,6 +434,11 @@ exports.addItems = async (req, res, next) => {
               unit: ing.unit
             });
           }
+        }
+        if (dish.ingredients.length === 0) {
+          console.warn(`[ventas] plato "${dish.name}" (${dish._id}) vendido sin receta: no descontará insumos al cobrar`);
+        } else if (nulos > 0) {
+          console.warn(`[ventas] plato "${dish.name}" (${dish._id}): ${nulos} insumo(s) con _id inexistente (borrado y recreado sin re-enlazar). Cobro no los descontará.`);
         }
 
         newDishItems.push({
@@ -525,6 +543,10 @@ exports.pay = async (req, res, next) => {
     const eventsToEmit = [];
     const alertsToCreate = [];
     if (!sale.stockDeducted && DESCONTAR_INVENTARIO) {
+      const sinConsumo = (sale.dishItems || []).filter((d) => !d.ingredientsConsumed || d.ingredientsConsumed.length === 0);
+      if (sinConsumo.length > 0) {
+        console.warn(`[ventas] cobro ${sale._id}: ${sinConsumo.length} plato(s) sin consumos guardados (${sinConsumo.map((d) => d.dishName).join(', ')}). Revisar receta del plato.`);
+      }
       const stockError = await deductSaleStock(sale, req.user._id, session, eventsToEmit, alertsToCreate);
       if (stockError) {
         await session.abortTransaction();

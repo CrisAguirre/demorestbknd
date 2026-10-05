@@ -10,13 +10,14 @@
 // CURRENT_SEED_VERSION en +1.
 const Settings = require('../models/Settings');
 const Sale = require('../models/Sale');
-const { seedRecetasData } = require('./seedRecetasDemo');
-const { seedBarraData } = require('./seedBarraDemo');
-const { seedCarta15Data, limpiezaTotalCarta } = require('./seedCarta15');
-const { seedBarraColombiaData } = require('./seedBarraColombia');
+const { seedRecetasData, categoriasRecetasDemo } = require('./seedRecetasDemo');
+const { seedBarraData, categoriasBarraDemo } = require('./seedBarraDemo');
+const { seedCarta15Data, repararCarta15Data, limpiezaTotalCarta, categoriasCarta15 } = require('./seedCarta15');
+const { seedBarraColombiaData, categoriasBarraColombia } = require('./seedBarraColombia');
 const { seedCostosReferenciaData } = require('./seedCostosReferencia');
+const { rellenarCategorias } = require('./categoriaInsumos');
 
-const CURRENT_SEED_VERSION = 6;
+const CURRENT_SEED_VERSION = 8;
 
 async function backfillStockDeducted(log) {
   // Ventas pendientes creadas con el código anterior YA descontaron stock
@@ -26,6 +27,18 @@ async function backfillStockDeducted(log) {
     { $set: { stockDeducted: true } }
   );
   (log || console).log(`[boot-seeds] ventas pendientes marcadas: ${r.modifiedCount || 0}`);
+}
+
+async function rellenarCategoriasInsumos(log) {
+  // v7: los insumos ya existían sin categoría. Se rellena desde los seeds
+  // (solo donde falta, sin pisar ediciones del usuario, stock ni nombres).
+  const lista = [
+    ...categoriasRecetasDemo,
+    ...categoriasBarraDemo,
+    ...categoriasCarta15,
+    ...categoriasBarraColombia,
+  ];
+  await rellenarCategorias(lista, log);
 }
 
 async function migrarPostPago(log) {
@@ -48,6 +61,13 @@ const PASOS = [
   // v5: la limpieza total del PR #7 quedó con versión 4 y nunca se ejecutó en prod.
   { version: 5, nombre: 'limpieza-total-carta', fn: limpiezaTotalCarta },
   { version: 6, nombre: 'costos-referencia', fn: seedCostosReferenciaData },
+  { version: 7, nombre: 'categorias-insumos', fn: rellenarCategoriasInsumos },
+  // v8: repara recetas C1..C15 tras borrados manuales SIN pisar ediciones del
+  // usuario (p.ej. porcionado en unidades de 100g). Solo re-enlaza por código
+  // los _id vigentes cuando la receta está vacía o apunta a insumos que ya no
+  // existen (borrado y recreado cambia el _id y el cobro no descuenta).
+  // Idempotente y seguro de re-ejecutar.
+  { version: 8, nombre: 'reparar-carta-15', fn: repararCarta15Data },
 ];
 
 async function runBootSeeds(log) {

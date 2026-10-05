@@ -19,4 +19,6 @@ tableSchema.virtual('isOccupied').get(function () {
   return this.status === 'ocupada';
 });
 
+tableSchema.index({ status: 1 });
+
 module.exports = mongoose.model('Table', tableSchema);

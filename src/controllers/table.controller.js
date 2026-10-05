@@ -11,7 +11,8 @@ exports.getAll = async (req, res, next) => {
   try {
     let tables = await Table.find().sort({ number: 1 })
       .populate({ path: 'currentSale', select: 'total createdAt' })
-      .populate({ path: 'currentReservation', select: 'customerName numberOfPeople date notes status' });
+      .populate({ path: 'currentReservation', select: 'customerName numberOfPeople date notes status' })
+      .lean();
 
     if (tables.length === 0) {
       // Create table 0 (takeout) + tables 1-16
@@ -19,23 +20,38 @@ exports.getAll = async (req, res, next) => {
       for (let i = 1; i <= 16; i++) {
         initial.push({ number: i, zona: zonaPorNumero(i) });
       }
-      tables = await Table.insertMany(initial);
-    } else {
-      // Ensure table 0 exists
-      const hasTable0 = tables.some(t => t.number === 0);
-      if (!hasTable0) {
-        const table0 = await Table.create({ number: 0, name: 'Para llevar', zona: zonaPorNumero(0) });
-        tables.unshift(table0);
-      }
-      // Backfill: asignar zona a mesas creadas antes de este campo.
-      // Se hace directo en BD porque el default del schema ocultaría los faltantes al leer.
-      const sinZona = { $or: [{ zona: { $exists: false } }, { zona: null }, { zona: '' }] };
-      await Table.updateMany({ ...sinZona, number: 0 }, { $set: { zona: 'Para llevar' } });
-      await Table.updateMany({ ...sinZona, number: { $gte: 9 } }, { $set: { zona: 'Salón 2' } });
-      await Table.updateMany({ ...sinZona, number: { $gte: 1, $lt: 9 } }, { $set: { zona: 'Salón 1' } });
+      await Table.insertMany(initial);
       tables = await Table.find().sort({ number: 1 })
         .populate({ path: 'currentSale', select: 'total createdAt' })
-        .populate({ path: 'currentReservation', select: 'customerName numberOfPeople date notes status' });
+        .populate({ path: 'currentReservation', select: 'customerName numberOfPeople date notes status' })
+        .lean();
+    } else {
+      // Ensure table 0 exists (solo 1 query extra, sin escrituras si ya existe)
+      const hasTable0 = tables.some(t => t.number === 0);
+      if (!hasTable0) {
+        await Table.create({ number: 0, name: 'Para llevar', zona: zonaPorNumero(0) });
+        tables = await Table.find().sort({ number: 1 })
+          .populate({ path: 'currentSale', select: 'total createdAt' })
+          .populate({ path: 'currentReservation', select: 'customerName numberOfPeople date notes status' })
+          .lean();
+      }
+      // Backfill de zona: solo si hay documentos sin zona (evita 3 updateMany + re-find en cada request)
+      const sinZonaCount = await Table.countDocuments({
+        $or: [{ zona: { $exists: false } }, { zona: null }, { zona: '' }]
+      });
+      if (sinZonaCount > 0) {
+        // Se hace directo en BD porque el default del schema ocultaría los faltantes al leer.
+        const sinZona = { $or: [{ zona: { $exists: false } }, { zona: null }, { zona: '' }] };
+        await Promise.all([
+          Table.updateMany({ ...sinZona, number: 0 }, { $set: { zona: 'Para llevar' } }),
+          Table.updateMany({ ...sinZona, number: { $gte: 9 } }, { $set: { zona: 'Salón 2' } }),
+          Table.updateMany({ ...sinZona, number: { $gte: 1, $lt: 9 } }, { $set: { zona: 'Salón 1' } })
+        ]);
+        tables = await Table.find().sort({ number: 1 })
+          .populate({ path: 'currentSale', select: 'total createdAt' })
+          .populate({ path: 'currentReservation', select: 'customerName numberOfPeople date notes status' })
+          .lean();
+      }
     }
 
     res.json(tables);
