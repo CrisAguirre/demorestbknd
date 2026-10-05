@@ -140,6 +140,18 @@ describe('Sale Controller', () => {
       expect(updated.stock).toBe(6);
     });
 
+    it('should pay OK but deduct nothing when dish has no recipe (sin receta)', async () => {
+      const sinReceta = await Dish.create({ name: 'Sin receta', category: 'Entradas', price: 10000, ingredients: [] });
+      const create = await request(app).post('/api/sales').set('Authorization', `Bearer ${adminToken}`).send({ items: [{ product: sinReceta._id, quantity: 1 }], tableNumber: 0 });
+      expect(create.status).toBe(201);
+      expect(create.body.status).toBe('pendiente');
+      expect(create.body.dishItems[0].ingredientsConsumed).toHaveLength(0);
+      const pay = await request(app).post(`/api/sales/${create.body._id}/pay`).set('Authorization', `Bearer ${adminToken}`).send({});
+      expect(pay.status).toBe(200);
+      const updated = await Ingredient.findById(ingredient._id);
+      expect(updated.stock).toBe(10);
+    });
+
     it('should reject pay with insufficient stock at billing time', async () => {
       const sale = await Sale.create({ user: admin._id, status: 'pendiente', items: [{ product: product._id, productName: 'Test Product', quantity: 3, unitPrice: 2500, subtotal: 7500 }], total: 7500 });
       await Product.findByIdAndUpdate(product._id, { stock: 1 });
@@ -169,7 +181,7 @@ describe('Sale Controller', () => {
     });
   });
 
-  describe('inventario desactivado (modo actual)', () => {
+  describe('inventario desactivado (modo manual)', () => {
     it('should create and pay without validating or deducting stock', async () => {
       saleCtrl.setDescontarInventario(false);
       const res = await request(app).post('/api/sales').set('Authorization', `Bearer ${adminToken}`).send({ items: [{ product: product._id, quantity: 100 }] });

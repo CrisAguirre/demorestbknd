@@ -14,6 +14,7 @@ const Category = require('../models/Category');
 const Alert = require('../models/Alert');
 const CashClosing = require('../models/CashClosing');
 const Settings = require('../models/Settings');
+const Table = require('../models/Table');
 
 // ── helpers (replicated from report.controller to avoid circular deps) ──────
 function getStartDate(period) {
@@ -73,7 +74,8 @@ exports.preload = async (req, res, next) => {
       salesDay,
       salesWeek,
       topProducts,
-      currentCash
+      currentCash,
+      tables
     ] = await Promise.all([
       // 1. Settings
       Settings.getSettings(),
@@ -128,7 +130,13 @@ exports.preload = async (req, res, next) => {
       ]),
 
       // 8. Current cash status
-      buildCurrentCash()
+      buildCurrentCash(),
+
+      // 9. Tables (mapa de mesas instantáneo tras login; evita round-trip en /mesas)
+      Table.find().sort({ number: 1 })
+        .populate({ path: 'currentSale', select: 'total createdAt' })
+        .populate({ path: 'currentReservation', select: 'customerName numberOfPeople date notes status' })
+        .lean()
     ]);
 
     res.json({
@@ -139,7 +147,8 @@ exports.preload = async (req, res, next) => {
       salesDay,
       salesWeek,
       topProducts,
-      currentCash
+      currentCash,
+      tables
     });
   } catch (error) {
     next(error);

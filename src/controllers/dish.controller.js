@@ -26,6 +26,9 @@ exports.create = async (req, res, next) => {
         if (!ing) {
           return res.status(400).json({ message: `Ingrediente ${item.ingredient} no encontrado` });
         }
+        if (ing.isActive === false) {
+          return res.status(400).json({ message: `Ingrediente "${ing.name}" está desactivado en Inventarios: reactívelo antes de usarlo en la receta` });
+        }
       }
     }
     if (req.file) body.imageUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
@@ -49,6 +52,9 @@ exports.update = async (req, res, next) => {
         const ing = await Ingredient.findById(item.ingredient);
         if (!ing) {
           return res.status(400).json({ message: `Ingrediente ${item.ingredient} no encontrado` });
+        }
+        if (ing.isActive === false) {
+          return res.status(400).json({ message: `Ingrediente "${ing.name}" está desactivado en Inventarios: reactívelo antes de usarlo en la receta` });
         }
       }
     }

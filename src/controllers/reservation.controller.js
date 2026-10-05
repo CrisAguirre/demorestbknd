@@ -57,7 +57,8 @@ exports.getAll = async (req, res, next) => {
     const reservations = await Reservation.find(filter)
       .populate('table', 'number name')
       .populate('createdBy', 'name')
-      .sort({ date: 1 });
+      .sort({ date: 1 })
+      .lean();
 
     res.json(reservations);
   } catch (error) {

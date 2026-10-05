@@ -14,4 +14,8 @@ const reservationSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+reservationSchema.index({ table: 1, status: 1 });
+reservationSchema.index({ date: 1 });
+reservationSchema.index({ status: 1 });
+
 module.exports = mongoose.model('Reservation', reservationSchema);
