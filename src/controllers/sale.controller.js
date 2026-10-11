@@ -7,7 +7,6 @@ const Alert = require('../models/Alert');
 const Table = require('../models/Table');
 const KitchenOrder = require('../models/KitchenOrder');
 const DeliveryOrder = require('../models/DeliveryOrder');
-const Settings = require('../models/Settings');
 const { emitKitchenEvent, emitDataChange } = require('../services/socketService');
 
 // Interruptor maestro del descuento de inventario.
@@ -49,8 +48,15 @@ async function deductSaleStock(sale, userId, session, eventsToEmit, alertsToCrea
     await product.save({ session });
 
     await recordMovement(
-      product, 'sale', i.quantity, previousStock, product.stock,
-      userId, sale._id, 'Sale', `Venta ${sale._id} cobrada (${i.quantity} unidades)`
+      product,
+      'sale',
+      i.quantity,
+      previousStock,
+      product.stock,
+      userId,
+      sale._id,
+      'Sale',
+      `Venta ${sale._id} cobrada (${i.quantity} unidades)`
     );
     await product.save({ session });
 
@@ -80,8 +86,15 @@ async function deductSaleStock(sale, userId, session, eventsToEmit, alertsToCrea
       await ing.save({ session });
 
       await recordMovement(
-        ing, 'sale', c.quantity, previousStock, ing.stock,
-        userId, sale._id, 'Sale', `Consumo venta ${sale._id} ("${d.dishName}" x${d.quantity})`
+        ing,
+        'sale',
+        c.quantity,
+        previousStock,
+        ing.stock,
+        userId,
+        sale._id,
+        'Sale',
+        `Consumo venta ${sale._id} ("${d.dishName}" x${d.quantity})`
       );
       await ing.save({ session });
 
@@ -204,7 +217,6 @@ exports.create = async (req, res, next) => {
     // Todo pedido con mesa (incluido Para llevar) trabaja post-pago:
     // queda pendiente hasta el cobro. Solo mostrador sin mesa cobra de inmediato.
     // Excepción explícita: pagoInmediato=true cobra al crear sin ocupar mesa.
-    const settings = await Settings.getSettings();
     const pagoInmediato = req.body.pagoInmediato === true;
     let status = 'pagada';
     if (hasTable && !pagoInmediato) {
