@@ -64,9 +64,17 @@ async function calcularCorte(cashClosing, hasta) {
     + entradasEfectivo - salidasEfectivo;
 
   return {
-    sales, porMetodo, ventasBrutas,
-    eventosPorMetodo, abonosEventos, conteoAbonos,
-    entradas, salidas, entradasEfectivo, salidasEfectivo, efectivoEsperado
+    sales,
+porMetodo,
+ventasBrutas,
+    eventosPorMetodo,
+abonosEventos,
+conteoAbonos,
+    entradas,
+salidas,
+entradasEfectivo,
+salidasEfectivo,
+efectivoEsperado
   };
 }
 
@@ -89,13 +97,18 @@ function construirReporteZ(cashClosing, corte, cajeroNombre, hasta) {
     abonosEventos: corte.abonosEventos,
     eventosPorMetodo: { ...corte.eventosPorMetodo },
     impuestos: {
-      base: 0, impoconsumo: 0, iva: 0,
+      base: 0,
+impoconsumo: 0,
+iva: 0,
       nota: 'Las ventas no discriminan impuestos; precios con impuesto incluido sin discriminar.'
     },
     propinas: { total: 0, nota: 'Propinas no registradas por separado en el periodo.' },
     movimientos: (cashClosing.movements || []).map((m) => ({
-      tipo: m.tipo, amount: m.amount, concept: m.concept,
-      method: m.method || 'efectivo', date: m.date
+      tipo: m.tipo,
+amount: m.amount,
+concept: m.concept,
+      method: m.method || 'efectivo',
+date: m.date
     })),
     entradasTotal: corte.entradas,
     salidasTotal: corte.salidas,

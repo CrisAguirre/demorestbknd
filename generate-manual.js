@@ -4,323 +4,504 @@ const path = require('path');
 
 const doc = new PDFDocument({
   size: 'LETTER',
-  margins: { top: 50, bottom: 55, left: 55, right: 55 },
-  info: { Title: 'Manual de Usuario - La Soupe à l\'Oignon' }
+  margins: { top: 48, bottom: 50, left: 50, right: 50 },
+  info: {
+    Title: "Manual de Usuario - La Soupe à l'Oignon & Marie Antoinette",
+    Author: "Equipo de Desarrollo La Soupe à l'Oignon",
+    Subject: "Manual Oficial del Sistema v2.0",
+    Keywords: "restaurante, pos, dashboard, cocina, inventario, caja"
+  }
 });
 
-const IMG = 'C:\\Users\\USUARIO\\AppData\\Local\\Temp\\opencode\\screenshots';
 const OUT = path.join(__dirname, 'MANUAL_DE_USUARIO.pdf');
+const FRONTEND_ASSETS = path.join(__dirname, '..', 'demorest', 'src', 'assets');
+const writeStream = fs.createWriteStream(OUT);
+doc.pipe(writeStream);
 
-doc.pipe(fs.createWriteStream(OUT));
+// ── PALETA DE COLORES ELEGANTE ──
+const gold = '#D4AF37';
+const bronze = '#8B5A2B';
+const dark = '#0D111A';
+const surface = '#151926';
+const cardBg = '#F7F8FA';
+const borderCol = '#E2E6EC';
+const gray = '#666B7A';
+const textDark = '#1F2430';
+const green = '#1B8755';
+const red = '#DC3545';
+const blue = '#0D6EFD';
 
-const gold = '#D4AF37', bronze = '#8B5A2B', dark = '#151822', gray = '#888';
 const date = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
 
-function np() { doc.addPage(); doc.y = 50; }
-function h1(t) { doc.fontSize(20).font('Helvetica-Bold').fillColor(dark).text(t, 55, doc.y); doc.moveDown(0.25); doc.fillColor(gold).rect(55, doc.y, 50, 2.5).fill(); doc.moveDown(0.5); }
-function h2(t) { doc.fontSize(12).font('Helvetica-Bold').fillColor(bronze).text(t, 55, doc.y); doc.moveDown(0.3); }
-function txt(t) { doc.fontSize(9).font('Helvetica').fillColor(dark).text(t, 55, doc.y, { align: 'justify', lineGap: 2 }); doc.moveDown(0.2); }
-function dot(t) { doc.fontSize(9).font('Helvetica').fillColor(dark).text(`  \u2022 ${t}`, 55, doc.y, { lineGap: 2 }); doc.moveDown(0.05); }
-function sp(n) { doc.moveDown(n || 0.3); }
-
-function pic(name, caption, width) {
-  const fp = path.join(IMG, name);
-  if (!fs.existsSync(fp)) { txt(`[imagen ${name} no encontrada]`); return; }
-  const w = width || 300;
-  const img = doc.openImage(fp);
-  const h = img.height * (w / img.width);
-  if (doc.y + h + 35 > 732) np();
-  doc.image(fp, 55 + (502 - w) / 2, doc.y, { width: w });
-  doc.y += h + 3;
-  if (caption) { doc.fontSize(7).font('Helvetica-Oblique').fillColor(gray).text(caption, 55, doc.y, { align: 'center' }); doc.moveDown(0.3); }
+// ── UTILIDADES DE MAQUETACIÓN ──
+function checkPageBreak(spaceNeeded) {
+  if (doc.y + spaceNeeded > 730) {
+    doc.addPage();
+    doc.y = 48;
+  }
 }
 
-function tbl(h, rows, colW) {
-  const left = 55, totalW = colW.reduce((a,b)=>a+b,0);
-  const colX = []; let x = left;
+function np() {
+  doc.addPage();
+  doc.y = 48;
+}
+
+function headerBar(title, subtitle) {
+  checkPageBreak(50);
+  doc.fontSize(16).font('Helvetica-Bold').fillColor(dark).text(title, 50, doc.y);
+  doc.moveDown(0.2);
+  doc.fillColor(gold).rect(50, doc.y, 45, 2.5).fill();
+  doc.moveDown(0.4);
+  if (subtitle) {
+    doc.fontSize(8.5).font('Helvetica-Oblique').fillColor(gray).text(subtitle, 50, doc.y);
+    doc.moveDown(0.4);
+  }
+}
+
+function h2(t) {
+  checkPageBreak(30);
+  doc.fontSize(11).font('Helvetica-Bold').fillColor(bronze).text(t, 50, doc.y);
+  doc.moveDown(0.25);
+}
+
+function txt(t) {
+  checkPageBreak(18);
+  doc.fontSize(8.5).font('Helvetica').fillColor(textDark).text(t, 50, doc.y, { align: 'justify', lineGap: 2.2 });
+  doc.moveDown(0.25);
+}
+
+function dot(boldTitle, content) {
+  checkPageBreak(16);
+  doc.fontSize(8.5).font('Helvetica-Bold').fillColor(dark).text(`  •  ${boldTitle}: `, 50, doc.y, { continued: true });
+  doc.font('Helvetica').fillColor(textDark).text(content, { lineGap: 2 });
+  doc.moveDown(0.15);
+}
+
+function sp(n) {
+  doc.moveDown(n || 0.3);
+}
+
+function badgeBox(title, items, accentColor = gold) {
+  const boxW = 512;
+  const itemH = 14;
+  const padding = 8;
+  const calculatedH = padding * 2 + 16 + items.length * itemH;
+  checkPageBreak(calculatedH + 10);
+
+  const startY = doc.y;
+  doc.fillColor('#F9FAFC').rect(50, startY, boxW, calculatedH).fill();
+  doc.strokeColor(borderCol).lineWidth(0.8).rect(50, startY, boxW, calculatedH).stroke();
+  doc.fillColor(accentColor).rect(50, startY, 4, calculatedH).fill();
+
+  doc.fontSize(9.5).font('Helvetica-Bold').fillColor(dark).text(title, 62, startY + 8);
+  let curY = startY + 24;
+  for (const it of items) {
+    doc.fontSize(8).font('Helvetica').fillColor(textDark).text(`✔  ${it}`, 64, curY);
+    curY += itemH;
+  }
+  doc.y = startY + calculatedH + 8;
+}
+
+function callout(text, type = 'info') {
+  checkPageBreak(36);
+  const startY = doc.y;
+  const boxW = 512;
+  const bg = type === 'tip' ? '#F0F9F4' : type === 'warn' ? '#FFF9E6' : '#F2F6FC';
+  const bar = type === 'tip' ? green : type === 'warn' ? '#E6A23C' : blue;
+  const icon = type === 'tip' ? '💡 TIP: ' : type === 'warn' ? '⚠️ IMPORTANTE: ' : 'ℹ️ NOTA: ';
+
+  doc.fillColor(bg).rect(50, startY, boxW, 30).fill();
+  doc.fillColor(bar).rect(50, startY, 3, 30).fill();
+  doc.fontSize(8).font('Helvetica-Bold').fillColor(bar).text(icon, 58, startY + 8, { continued: true });
+  doc.font('Helvetica').fillColor(textDark).text(text, { width: boxW - 20, lineGap: 1.5 });
+  doc.y = startY + 36;
+}
+
+function tbl(headers, rows, colW) {
+  const left = 50;
+  const totalW = colW.reduce((a, b) => a + b, 0);
+  const colX = [];
+  let x = left;
   for (const w of colW) { colX.push(x); x += w; }
-  const hdrH = 19, rowH = 16, th = hdrH + rows.length * rowH + 4;
-  if (doc.y + th + 20 > 732) np();
+  const hdrH = 18;
+  const rowH = 15;
+  const th = hdrH + rows.length * rowH;
+
+  checkPageBreak(th + 15);
+
   const sy = doc.y;
   doc.rect(left, sy, totalW, hdrH).fill(dark);
-  doc.fillColor(gold).fontSize(7).font('Helvetica-Bold');
-  for (let i = 0; i < h.length; i++) doc.text(h[i], colX[i] + 4, sy + 5, { width: colW[i] - 4 });
+  doc.fillColor(gold).fontSize(7.5).font('Helvetica-Bold');
+  for (let i = 0; i < headers.length; i++) {
+    doc.text(headers[i], colX[i] + 4, sy + 4.5, { width: colW[i] - 6, align: 'left' });
+  }
+
   let y = sy + hdrH;
   for (let ri = 0; ri < rows.length; ri++) {
-    doc.fillColor(ri % 2 === 0 ? '#FFF' : '#F5F3EE').rect(left, y, totalW, rowH).fill();
-    doc.fillColor(dark).fontSize(6.5).font('Helvetica');
-    for (let ci = 0; ci < rows[ri].length; ci++) doc.text(rows[ri][ci], colX[ci] + 4, y + 4, { width: colW[ci] - 4 });
+    doc.fillColor(ri % 2 === 0 ? '#FFFFFF' : '#F6F8FB').rect(left, y, totalW, rowH).fill();
+    doc.fillColor(textDark).fontSize(7).font('Helvetica');
+    for (let ci = 0; ci < rows[ri].length; ci++) {
+      const val = rows[ri][ci];
+      if (val === '✓') {
+        doc.font('Helvetica-Bold').fillColor(green);
+      } else if (val === '—') {
+        doc.font('Helvetica').fillColor('#A0A5B5');
+      } else {
+        doc.font('Helvetica').fillColor(textDark);
+      }
+      doc.text(val, colX[ci] + 4, y + 3.5, { width: colW[ci] - 6 });
+    }
     y += rowH;
   }
-  doc.strokeColor('#CCC').lineWidth(0.5).rect(left, sy, totalW, y - sy).stroke();
-  doc.y = y + 4;
+  doc.strokeColor(borderCol).lineWidth(0.5).rect(left, sy, totalW, y - sy).stroke();
+  doc.y = y + 8;
 }
 
-// ═══════════ COVER ═══════════
-doc.fillColor('#0A0C14').rect(0, 0, doc.page.width, doc.page.height).fill();
-doc.fillColor(gold).rect(0, 170, doc.page.width, 3).fill();
-doc.fillColor(gold).fontSize(46).font('Helvetica-Bold').text('La Soupe', 0, 220, { align: 'center' });
-doc.text("à l'Oignon", 0, 270, { align: 'center' });
-doc.fillColor('#FFF').fontSize(20).font('Helvetica').text('Manual de Usuario', 0, 340, { align: 'center' });
-doc.fillColor('#AAA').fontSize(10).text('Sistema de Gesti\u00f3n Restaurantera', 0, 385, { align: 'center' });
-doc.text(`Versi\u00f3n 1.0 \u2014 ${date}`, 0, 408, { align: 'center' });
+// ════════════════════════════════════════════════════════════════
+// 1. PORTADA ELEGANTE (ESTILO PARISIÉN DE ALTA GAMA)
+// ════════════════════════════════════════════════════════════════
+doc.fillColor('#090B12').rect(0, 0, doc.page.width, doc.page.height).fill();
+
+// Marcos dorados concéntricos
+doc.strokeColor(gold).lineWidth(1).rect(28, 28, doc.page.width - 56, doc.page.height - 56).stroke();
+doc.strokeColor(gold).lineWidth(0.4).rect(32, 32, doc.page.width - 64, doc.page.height - 64).stroke();
+
+// Banda dorada superior
+doc.fillColor(gold).rect(32, 160, doc.page.width - 64, 2.5).fill();
+
+// Título principal
+doc.fillColor(gold).fontSize(38).font('Helvetica-Bold').text('La Soupe', 0, 205, { align: 'center' });
+doc.fontSize(38).text("à l'Oignon", 0, 250, { align: 'center' });
+doc.fontSize(14).font('Helvetica-Oblique').fillColor('#E5D392').text('& Marie Antoinette', 0, 300, { align: 'center' });
+
+doc.fillColor('#FFFFFF').fontSize(18).font('Helvetica-Bold').text('MANUAL OFICIAL DE USUARIO', 0, 360, { align: 'center' });
+doc.fillColor('#A4B0C6').fontSize(10).font('Helvetica').text('Sistema Integral de Gestión Restaurantera y Salón de Té', 0, 390, { align: 'center' });
+
+// Tarjeta central de versión
+doc.fillColor(surface).rect(160, 440, doc.page.width - 320, 75).fill();
+doc.strokeColor(gold).lineWidth(0.7).rect(160, 440, doc.page.width - 320, 75).stroke();
+doc.fillColor(gold).fontSize(11).font('Helvetica-Bold').text('VERSIÓN 2.0 FULL-STACK', 160, 455, { align: 'center' });
+doc.fillColor('#FFFFFF').fontSize(8.5).font('Helvetica').text(`Edición Actualizada: ${date}`, 160, 475, { align: 'center' });
+doc.fillColor('#8E9AA8').fontSize(7.5).text('Plataforma Web Cloud (Vercel + Render + Socket.IO)', 160, 492, { align: 'center' });
+
+// Pie de portada
+doc.fillColor(gold).rect(32, 660, doc.page.width - 64, 1.5).fill();
+doc.fillColor('#7E8799').fontSize(8).font('Helvetica').text('Documentación Técnica y Operativa para Administradores, Cajeros y Cocina', 0, 680, { align: 'center' });
+
 np();
 
-// ═══════════ INDEX ═══════════
-h1('\u00cdndice');
-sp(0.3);
-for (const i of ['1. Roles y Accesos','2. Primer Ingreso','3. Dashboard','4. POS \u2014 Punto de Venta','5. Cocina','6. Domicilios','7. Caja','8. Inventario','9. Reportes \u2014 Centro de Inteligencia','10. Alertas','11. Configuraci\u00f3n','12. Finanzas','13. Personal y Usuarios','14. Talonarios','15. M\u00f3dulos Administrativos','16. Funcionalidades Transversales','17. Soluci\u00f3n de Problemas','18. URLs de Referencia']) {
-  doc.fontSize(10).font('Helvetica').fillColor(dark).text(i, 55, doc.y, { lineGap: 5 });
+// ════════════════════════════════════════════════════════════════
+// 2. ÍNDICE GENERAL
+// ════════════════════════════════════════════════════════════════
+headerBar('Índice de Contenidos', 'Guía estructurada por módulos y procedimientos');
+
+const indexItems = [
+  { num: '01', title: 'Roles de Usuario y Matriz de Permisos', desc: 'Perfiles de acceso y seguridad por rol' },
+  { num: '02', title: 'Primer Ingreso y Menú Lateral Retraído (Sidebar 60px)', desc: 'Autenticación y navegación por acordeones' },
+  { num: '03', title: 'El Nuevo Dashboard Dinámico (Home del Sistema)', desc: 'Métricas en vivo, mapa de mesas, caja y stock crítico' },
+  { num: '04', title: 'Operaciones de Salón: Mesas y Punto de Venta (POS)', desc: 'Toma de pedidos, comandas, barcode y cobros' },
+  { num: '05', title: 'Cocina en Vivo (KDS) y Barra de Coctelería', desc: 'Kanban en tiempo real, avisos sonoros y recetas' },
+  { num: '06', title: 'Logística de Domicilios y Gestión de Eventos', desc: 'Seguimiento de pedidos foráneos y banquetes BEO' },
+  { num: '07', title: 'Caja, Turnos y Facturación Consecutiva', desc: 'Aperturas, movimientos, arqueos Z y talonarios' },
+  { num: '08', title: 'Cadena de Suministro: Inventarios, Proveedores y Compras', desc: 'Centros de costo, stock crítico y órdenes de compra' },
+  { num: '09', title: 'Personal, Turnos y Usuarios del Sistema', desc: 'Administración de talento humano y cuentas' },
+  { num: '10', title: 'Módulo de Análisis: Reportes, Finanzas y Alertas', desc: 'Analítica en 4 pestañas, exportación CSV y SMTP' },
+  { num: '11', title: 'Gestión Administrativa y Configuración Unificada', desc: 'Identidad, logo, servidor SMTP y catálogo de familias' },
+  { num: '12', title: 'Documentación Institucional y SG-SST', desc: 'Manuales de BPM, formatos operativos y matriz de riesgos' },
+  { num: '13', title: 'Solución de Problemas Frecuentes y Enlaces', desc: 'Guía de contingencia y URLs de los servicios' }
+];
+
+let idxY = doc.y;
+for (const item of indexItems) {
+  checkPageBreak(30);
+  idxY = doc.y;
+  doc.fillColor('#F5F7FA').rect(50, idxY, 512, 24).fill();
+  doc.strokeColor(borderCol).lineWidth(0.4).rect(50, idxY, 512, 24).stroke();
+
+  doc.fillColor(gold).fontSize(9).font('Helvetica-Bold').text(item.num, 58, idxY + 6);
+  doc.fillColor(dark).fontSize(8.5).font('Helvetica-Bold').text(item.title, 85, idxY + 6);
+  doc.fillColor(gray).fontSize(7.5).font('Helvetica-Oblique').text(item.desc, 320, idxY + 6.5, { align: 'right', width: 232 });
+  doc.y = idxY + 28;
 }
+
 np();
 
-// ═══════════ 1. ROLES ═══════════
-h1('1. Roles y Accesos');
-txt('Cada usuario tiene un rol que determina qu\u00e9 m\u00f3dulos puede ver y qu\u00e9 acciones puede realizar.');
-h2('Roles del Sistema');
-for (const [r, d] of [['admin','Acceso total a todos los m\u00f3dulos'],['cajero','POS, caja, domicilios (lectura), alertas, talonarios'],['cocinero','Cocina, domicilios (aceptar), dashboard'],['mesero','Solo perfil personal'],['cliente','Perfil personal y tienda p\u00fablica']]) {
-  doc.fontSize(9).font('Helvetica-Bold').fillColor(bronze).text(` ${r}  `, 55, doc.y, { continued: true });
-  doc.font('Helvetica').fillColor(dark).text(d, { lineGap: 3 });
-}
+// ════════════════════════════════════════════════════════════════
+// 3. SECCIÓN 1: ROLES Y PERMISOS
+// ════════════════════════════════════════════════════════════════
+headerBar('1. Roles de Usuario y Matriz de Permisos', 'Control granular de accesos protegido por tokens JWT');
+
+txt('El sistema opera bajo un modelo de control de acceso basado en roles (RBAC). Cada usuario cuenta con credenciales únicas que restringen la visibilidad de los módulos según su responsabilidad operativa en el restaurante.');
+
+h2('Definición de Perfiles');
+dot('Administrador (admin)', 'Acceso ilimitado a operaciones, finanzas, inventarios, configuraciones y reportes.');
+dot('Cajero (cajero)', 'Especializado en POS, caja registradora, lectura de domicilios, alertas de insumos y talonarios.');
+dot('Cocinero (cocinero)', 'Enfocado en la pantalla KDS de comandas, aceptación de domicilios y panel resumen de pedidos.');
+dot('Mesero (mesero)', 'Perfil de salón para consultar comandas de mesas asignadas y perfil propio.');
+dot('Cliente (cliente)', 'Acceso exclusivo a perfil personal e historial en la carta pública.');
+
+sp(0.2);
+h2('Matriz de Acceso por Módulo');
+
+tbl(
+  ['Módulo / Función', 'admin', 'cajero', 'cocinero', 'mesero', 'cliente'],
+  [
+    ['Dashboard Dinámico (Home)', '✓', '✓', '✓', '✓', '—'],
+    ['Mesas (Salones)', '✓', '✓', '—', '✓', '—'],
+    ['POS (Punto de Venta)', '✓', '✓', '—', '—', '—'],
+    ['Cocina en Vivo (KDS)', '✓', '—', '✓', '—', '—'],
+    ['Barra y Coctelería', '✓', '—', '—', '—', '—'],
+    ['Domicilios (Kanban)', '✓', '✓', '✓', '—', '—'],
+    ['Caja y Turnos', '✓', '✓', '—', '—', '—'],
+    ['Talonarios', '✓', '✓', '—', '—', '—'],
+    ['Inventarios e Insumos', '✓', '—', '—', '—', '—'],
+    ['Platos y Recetas', '✓', '—', '—', '—', '—'],
+    ['Proveedores y Compras', '✓', '—', '—', '—', '—'],
+    ['Personal y Usuarios', '✓', '—', '—', '—', '—'],
+    ['Centro de Reportes', '✓', '—', '—', '—', '—'],
+    ['Alertas de Stock', '✓', '✓', '—', '—', '—'],
+    ['Finanzas (P&L)', '✓', '—', '—', '—', '—'],
+    ['Configuración + Categorías', '✓', '—', '—', '—', '—']
+  ],
+  [192, 64, 64, 64, 64, 64]
+);
+
+callout('Las credenciales están encriptadas con algoritmos seguros en MongoDB. Cualquier intento de acceso no autorizado responderá con código HTTP 403 Forbidden.', 'info');
+
+np();
+
+// ════════════════════════════════════════════════════════════════
+// 4. SECCIÓN 2: PRIMER INGRESO Y MENÚ LATERAL RETRAÍDO
+// ════════════════════════════════════════════════════════════════
+headerBar('2. Primer Ingreso y Menú Lateral Retraído (Sidebar 60px)', 'Ergonomía visual y diseño limpio en el puesto de trabajo');
+
+txt('Al acceder a la plataforma web (URL oficial o local), el usuario encuentra la pantalla de autenticación centralizada. Tras ingresar el correo y contraseña, el sistema redirige automáticamente a la nueva pantalla de Home (Dashboard).');
+
+h2('Características del Nuevo Menú Lateral (Sidebar Acordeón)');
+dot('Estado Inicial Retraído', 'Para no saturar la vista del operario y priorizar el espacio de trabajo en pantallas POS o tablets, el sidebar se inicia colapsado con un ancho ergonómico de 60px.');
+dot('Botón de Conmutación (Toggle)', 'El botón superior permite alternar en 1 clic entre modo retraído (60px) y modo expandido (240px). La preferencia del usuario se memoriza automáticamente en el navegador.');
+dot('Agrupación en 8 Secciones Acordeón', 'Las más de 20 funcionalidades del sistema se organizan en bloques temáticos para administradores:');
+
+badgeBox('Estructura de los 8 Grupos Acordeón del Menú', [
+  'Inicio: Dashboard general del restaurante (/dashboard)',
+  'Operaciones: Mesas (/mesas), POS (/pos), Domicilios (/domicilios), Eventos (/events)',
+  'Cocina y Carta: Cocina KDS (/cocina), Barra (/barra), Platos/Recetas (/dishes), Tiqueteras (/ticket-books)',
+  'Caja y Ventas: Caja registradora (/cash), Talonarios (/talonarios)',
+  'Compras y Costos: Insumos (Cocina, Barra, Servicio), Proveedores, Compras, Gastos',
+  'Personal: Gestión de Personal y Turnos de trabajo (/staff)',
+  'Análisis: Módulo de Análisis Financiero (/finance), Reportes (/reports) y Alertas (/alerts)',
+  'Gestión y Administración: Documentación (/documentacion), SG-SST (/sg-sst), Configuración (/settings)'
+], gold);
+
+dot('Auto-Expansión Inteligente', 'Si el usuario navega a cualquier submódulo (ej. Insumos Cocina), el acordeón correspondiente se despliega de forma automática y resalta la opción activa con una marca visual dorada.');
+
+np();
+
+// ════════════════════════════════════════════════════════════════
+// 5. SECCIÓN 3: EL NUEVO DASHBOARD DINÁMICO (HOME)
+// ════════════════════════════════════════════════════════════════
+headerBar('3. El Nuevo Dashboard Dinámico (Home del Sistema)', 'Centro neurálgico en tiempo real: ventas, mesas, pedidos y stock');
+
+txt('El Dashboard sustituye las vistas estáticas iniciales para transformarse en el verdadero centro de control del restaurante, disponible inmediatamente tras iniciar sesión en la ruta raíz (/dashboard).');
+
+h2('Componentes del Dashboard en Tiempo Real');
+dot('1. Tarjetas Métricas Superiores (KPIs)', 'Indicadores clave del día: Total de Ventas Facturadas, Número de Transacciones, Ticket Promedio y Órdenes Pendientes.');
+dot('2. Mini Mapa de Mesas en Vivo', 'Monitor rápido de la distribución de mesas (Salón 1, Salón 2, Para llevar) con indicadores circulares por color: Verde (Libre), Rojo (Ocupada con cuenta abierta) y Amarillo (Reservada).');
+dot('3. Monitor de Domicilios Activos', 'Listado visual con los pedidos foráneos en curso, tiempo transcurrido y repartidor asignado con punto luminoso pulsante.');
+dot('4. Estado de Caja del Turno', 'Alerta en vivo del estado de la gaveta (Abierta / Cerrada), base inicial y dinero acumulado en el turno actual.');
+dot('5. Top 5 Insumos Críticos de Stock', 'Detecta los 5 insumos con existencia más baja frente a su mínimo de seguridad. Muestra el stock actual, stock mínimo y un enlace directo de 1 clic a "/inventory/insumos".');
+dot('6. Gráfica Semanal de Ventas', 'Comparativa gráfica de ingresos de los últimos 7 días con totales consolidados.');
+dot('7. Ranking de Productos Más Vendidos', 'Top 5 de preparaciones más populares con conteo de unidades despachadas.');
+dot('8. Accesos Rápidos de 1 Clic', 'Botonera para saltar instantáneamente a: "+ Nueva Venta (POS)", "🍳 Ver Cocina (KDS)", "💵 Arqueo de Caja" y "📦 Nueva Compra".');
+
+callout('El Dashboard está sincronizado mediante WebSockets (Socket.IO): cada vez que un mesero toma una comanda o un cocinero entrega un plato, los números se actualizan sin refrescar la página.', 'tip');
+
+np();
+
+// ════════════════════════════════════════════════════════════════
+// 6. SECCIÓN 4: OPERACIONES DE SALÓN Y POS
+// ════════════════════════════════════════════════════════════════
+headerBar('4. Operaciones de Salón: Mesas y Punto de Venta (POS)', 'Agilidad en la comanda, código de barras y liquidación');
+
+txt('El módulo POS (/pos) y la gestión de salones (/mesas) están diseñados para brindar la máxima velocidad de atención en horas pico.');
+
+h2('Paso a Paso: Registro de una Venta en POS');
+dot('Paso 1: Asignación de Mesa', 'Seleccione la mesa física en el menú desplegable superior. Si el pedido es para llevar o domicilio, déjela sin asignar.');
+dot('Paso 2: Búsqueda de Productos', 'Navegue por las categorías visuales de la carta o use el buscador en vivo ingresando el nombre del plato o pasando el lector de código de barras.');
+dot('Paso 3: Personalización de la Comanda', 'Haga clic en un plato para sumarlo al carrito. Puede ajustar porciones o añadir notas especiales (ej. "Término medio", "Té sin azúcar").');
+dot('Paso 4: Selección del Método de Pago', 'El cajero puede elegir: Efectivo (calcula cambio), Transferencia (QR / datáfono) o Mixto (divide valores).');
+dot('Paso 5: Cobro y Cierre', 'Presione "Cobrar". El sistema dispara tres acciones automáticas inmediatas:');
+
+badgeBox('Acciones Automáticas al Cobrar', [
+  'Emisión y despacho de la comanda a la pantalla de Cocina / KDS vía WebSocket.',
+  'Deducción inmediata de los insumos según la receta y escandallo del plato.',
+  'Consumo de un consecutivo del talonario de facturación activo.'
+], bronze);
+
+np();
+
+// ════════════════════════════════════════════════════════════════
+// 7. SECCIÓN 5: COCINA EN VIVO Y BARRA
+// ════════════════════════════════════════════════════════════════
+headerBar('5. Cocina en Vivo (KDS) y Barra de Coctelería', 'Organización de producción sin papeles ni pérdidas');
+
+txt('El Kitchen Display System (/cocina) sustituye las antiguas comandas de papel por una pantalla dinámica e interactiva de producción.');
+
+h2('Flujo de Comandas en Cocina');
+dot('Timbre Sonoro de Notificación', 'Al ingresar un nuevo pedido desde el POS, el sistema emite una campanada sonora (Web Audio API) que alerta al equipo de cocina.');
+dot('Columna "Nuevos"', 'Muestra las comandas recién recibidas. El cocinero revisa los platos y presiona "Aceptar" para asumir la comanda.');
+dot('Columna "En Preparación"', 'Indica las comandas en fogón con el tiempo transcurrido en minutos. Al terminar los platos, el cocinero presiona "Entregado".');
+dot('Columna "Entregados"', 'Comandas listas para ser retiradas por el mesero y servidas a la mesa.');
+
+h2('Módulo de Barra y Coctelería (/barra)');
+txt('Administra la preparación de bebidas frías, cocteles de autor (15 recetas estándar) y servicio de té parisino, asegurando la dosificación exacta de 1.5 oz por copa.');
+
+h2('Platos, Recetas y Escandallo (/dishes)');
+txt('Permite costear cada plato de la carta en función de los ingredientes que lo componen. El sistema calcula en tiempo real el costo unitario de producción y sugiere el precio de venta óptimo garantizando el margen del restaurante.');
+
+np();
+
+// ════════════════════════════════════════════════════════════════
+// 8. SECCIÓN 6: CAJA, TURNOS Y FACTURACIÓN
+// ════════════════════════════════════════════════════════════════
+headerBar('6. Caja, Turnos y Facturación Consecutiva', 'Auditoría estricta de ingresos, egresos y cierres de turno');
+
+txt('El módulo de Caja (/cash) garantiza el cuadre perfecto del dinero en caja chica y cuentas bancarias en cada turno laboral.');
+
+h2('Ciclo Diario de Caja');
+dot('1. Apertura de Caja', 'El cajero entrante ingresa el valor de la base en efectivo disponible (por defecto $300.000 COP) y confirma la apertura.');
+dot('2. Movimientos del Turno', 'Permite registrar egresos justificados (compra urgente de insumos menores) o ingresos extraordinarios.');
+dot('3. Arqueo Ciego', 'Al finalizar la jornada, el cajero cuenta físicamente el dinero en gaveta e ingresa la cantidad sin ver el total acumulado en el sistema.');
+dot('4. Cierre Z y Cuadre', 'El sistema contrasta el conteo físico contra las ventas registradas por POS (efectivo y transferencias) y determina si hay descuadre (sobrante o faltante).');
+
+h2('Control de Talonarios (/talonarios)');
+txt('Permite registrar rangos de numeración consecutiva autorizada para comprobantes. Al emitir ventas, el talonario descuenta los folios y alerta cuando quedan menos de 50 disponibles.');
+
+np();
+
+// ════════════════════════════════════════════════════════════════
+// 9. SECCIÓN 7: INVENTARIOS, PROVEEDORES Y COMPRAS
+// ════════════════════════════════════════════════════════════════
+headerBar('7. Cadena de Suministro e Inventarios', 'Control de existencias por 3 áreas y compras directas');
+
+txt('El restaurante maneja inventarios sectorizados para evitar confusiones de bodega:');
+dot('Insumos de Cocina (/inventory/insumos)', 'Proteínas, quesos franceses, verduras, harinas, aceites y condimentos.');
+dot('Insumos de Barra (/inventory/barra)', 'Licores nacionales e importados, mixers, jarabes, café especial y té.');
+dot('Insumos de Servicio (/inventory/servicio)', 'Servilletas, empaques biodegradables, vajilla, copas y mantelería.');
+
+h2('Proveedores y Órdenes de Compra (/suppliers & /purchases)');
+dot('Código Automático de Proveedor', 'Al crear un proveedor, el sistema le asigna un código mnemotécnico irrepetible.');
+dot('Órdenes de Compra', 'Permite registrar pedidos a proveedores con precios unitarios pactados. Al recibir la mercancía, el sistema ingresa los insumos al inventario y actualiza el costo promedio ponderado.');
+
+callout('Cada insumo cuenta con un nivel de Stock Mínimo. Cuando la existencia baja de este límite, el sistema genera una alerta visual y en el Dashboard.', 'warn');
+
+np();
+
+// ════════════════════════════════════════════════════════════════
+// 10. SECCIÓN 8: MÓDULO DE ANÁLISIS, REPORTES Y ALERTAS
+// ════════════════════════════════════════════════════════════════
+headerBar('8. Módulo de Análisis: Reportes, Finanzas y Alertas', 'Analítica estratégica de ventas, márgenes y productividad');
+
+txt('El módulo de Análisis (/reports y /finance) reúne toda la información histórica en cuatro perspectivas especializadas:');
+
+badgeBox('Pestañas de Analítica Empresarial', [
+  'Ventas: Gráfica de ingresos, ticket promedio, franjas horarias de mayor consumo y métodos de pago.',
+  'Inventario: Valorización monetaria del stock en almacén y estimación de utilidad potencial.',
+  'Productos: Ranking de los 10 platos estrella, productos sin rotación y márgenes de rentabilidad.',
+  'Cocina: Medición de tiempos de preparación por turno y cocinero para optimizar el servicio.'
+], blue);
+
+h2('Exportación de Datos');
+txt('Cada pestaña cuenta con un botón para descargar la información a archivos CSV con codificación UTF-8 BOM, 100% compatibles con Microsoft Excel y Google Sheets.');
+
+h2('Panel Financiero (P&L) (/finance)');
+txt('Muestra el estado mensual consolidado: Ingresos Totales (-) Costo de Alimentos (COGS) (-) Gastos Operativos (=) Utilidad Neta real del negocio.');
+
+h2('Alertas de Stock y Envíos por Correo (/alerts)');
+txt('Permite revisar insumos bajo mínimos, con botón "Verificar Stock" que analiza todo el catálogo y emite correos automáticos si el servidor SMTP está configurado.');
+
+np();
+
+// ════════════════════════════════════════════════════════════════
+// 11. SECCIÓN 9: ADMINISTRACIÓN Y CONFIGURACIÓN UNIFICADA
+// ════════════════════════════════════════════════════════════════
+headerBar('9. Configuración y Categorías Unificadas', 'Consolidación de parámetros maestros en un solo punto');
+
+txt('En la versión 2.0, el menú lateral fue optimizado unificando el catálogo de Categorías dentro del módulo de Configuración (/settings) mediante un sistema intuitivo de pestañas:');
+
+h2('Pestaña 1: ⚙️ General');
+dot('Datos del Establecimiento', 'Nombre comercial, NIT, teléfono de contacto, WhatsApp y dirección física.');
+dot('Logotipo Oficial', 'Subida y actualización del logo en alta resolución para encabezados de tickets.');
+dot('Servidor de Correo SMTP', 'Host, puerto (465 SSL / 587 TLS), usuario y clave de aplicación para despacho de alertas.');
+dot('Manual de Usuario', 'Botón de acceso directo para visualizar o descargar este documento en PDF.');
+dot('Limpiar Caché Local', 'Botón para renovar inmediatamente la memoria del navegador en caso de actualizaciones.');
+
+h2('Pestaña 2: 📂 Categorías');
+txt('Permite administrar las familias de productos de la carta y del almacén:');
+dot('Listado Interactivo', 'Tabla con código de categoría, nombre, tipo (Alimentos, Bebidas, Servicios), icono y orden.');
+dot('Acciones CRUD', 'Botones para crear una nueva categoría, editar datos o desactivarla con alertas seguras.');
+
+callout('La antigua ruta independiente "/categories" ahora redirige de forma transparente y automática a "/settings", manteniendo total compatibilidad con enlaces guardados.', 'info');
+
+np();
+
+// ════════════════════════════════════════════════════════════════
+// 12. SECCIÓN 10: SOLUCIÓN DE PROBLEMAS Y ENLACES
+// ════════════════════════════════════════════════════════════════
+headerBar('10. Guía de Solución de Problemas y Enlaces Útiles', 'Protocolo de contingencia y referencias operativas');
+
+h2('Resolución de Incidencias Frecuentes');
+
+tbl(
+  ['Problema Detectado', 'Causa Probable', 'Solución Recomendada'],
+  [
+    ['El Dashboard no actualiza datos', 'Conexión débil o caché expirada', 'Recargue la página o vaya a Settings > Limpiar Caché.'],
+    ['La cocina no emite sonido', 'Audio silenciado en navegador', 'Active el permiso de reproducción de sonido en el navegador.'],
+    ['No se envían correos de alerta', 'Credenciales SMTP erróneas', 'Revise usuario y use contraseña de aplicación en Settings.'],
+    ['Error 403 Prohibido', 'Rol sin permisos para el menú', 'Ingrese con cuenta admin o solicite permisos al encargado.'],
+    ['Error 401 No Autorizado', 'Sesión expirada por inactividad', 'Vuelva a iniciar sesión con sus credenciales.'],
+    ['No permite cobrar en POS', 'Caja cerrada o sin talonario', 'Abra el turno en Caja y asigne folios en Talonarios.']
+  ],
+  [140, 160, 212]
+);
+
 sp(0.4);
-h2('Matriz de Acceso por M\u00f3dulo');
-tbl(['M\u00f3dulo','admin','cajero','cociner','mesero','cliente'],
-  [['Dashboard','\u2713','\u2713','\u2713','\u2014','\u2014'],['POS','\u2713','\u2713','\u2014','\u2014','\u2014'],
-   ['Caja','\u2713','\u2713','\u2014','\u2014','\u2014'],['Inventario','\u2713','\u2014','\u2014','\u2014','\u2014'],
-   ['Categor\u00edas','\u2713','\u2014','\u2014','\u2014','\u2014'],['Ingredientes','\u2713','\u2014','\u2014','\u2014','\u2014'],
-   ['Platos','\u2713','\u2014','\u2014','\u2014','\u2014'],['Proveedores','\u2713','\u2014','\u2014','\u2014','\u2014'],
-   ['Compras','\u2713','\u2014','\u2014','\u2014','\u2014'],['Gastos','\u2713','\u2014','\u2014','\u2014','\u2014'],
-   ['Finanzas','\u2713','\u2014','\u2014','\u2014','\u2014'],['Reportes','\u2713','\u2014','\u2014','\u2014','\u2014'],
-   ['Alertas','\u2713','\u2713','\u2014','\u2014','\u2014'],['Cocina','\u2713','\u2014','\u2713','\u2014','\u2014'],
-   ['Domicilios','\u2713','\u2713','\u2713','\u2014','\u2014'],['Staff','\u2713','\u2014','\u2014','\u2014','\u2014'],
-   ['Talonarios','\u2713','\u2713','\u2014','\u2014','\u2014'],['Configuraci\u00f3n','\u2713','\u2014','\u2014','\u2014','*}']],
-  [130,46,46,48,46,46]);
-doc.fontSize(7).font('Helvetica-Oblique').fillColor(gray).text('  * Cliente solo ve su perfil personal');
-np();
+h2('Directorio de Enlaces y Accesos');
 
-// ═══════════ 2. PRIMER INGRESO ═══════════
-h1('2. Primer Ingreso');
-txt('Abra su navegador en la URL del frontend. Aparecer\u00e1 la pantalla de inicio de sesi\u00f3n.');
+tbl(
+  ['Servicio / Recurso', 'Dirección URL', 'Uso'],
+  [
+    ['Frontend de Producción', 'https://lasoupealoignon.vercel.app', 'Aplicación web oficial'],
+    ['API Backend (Render)', 'https://demorestbknd.onrender.com/api', 'Servicios REST y Socket.IO'],
+    ['Health Check Backend', 'https://demorestbknd.onrender.com/api/health', 'Monitor de estado del servidor'],
+    ['Sitio Web Comercial', 'https://www.restmarieantoinette.com', 'Carta digital y reservas']
+  ],
+  [130, 232, 150]
+);
 
-sp(0.1);
-h2('Paso 1: Ingresar credenciales');
-pic('login-clean.png', 'Formulario de inicio de sesi\u00f3n');
-txt('Ingrese su correo electr\u00f3nico y contrase\u00f1a. Presione "Ingresar" para acceder al sistema.');
+sp(1.2);
+doc.fontSize(12).font('Helvetica-Bold').fillColor(gold).text("La Soupe à l'Oignon & Marie Antoinette", 50, doc.y, { align: 'center' });
+doc.moveDown(0.2);
+doc.fontSize(8.5).font('Helvetica-Oblique').fillColor(gray).text('Tradición culinaria francesa & excelencia operativa digital.', { align: 'center' });
+doc.moveDown(0.2);
+doc.fontSize(7).font('Helvetica').fillColor('#9AA0B0').text(`Documentación generada el ${date} — Versión 2.0`, { align: 'center' });
 
-h2('Paso 2: Dashboard');
-sp(0.1);
-txt('Tras iniciar sesi\u00f3n, el sistema carga el Dashboard con los indicadores del d\u00eda.');
-
-h2('Credenciales de Prueba');
-tbl(['Perfil','Email','Contrase\u00f1a'],
-  [['admin','admin@test.com','Admin123!'],['cajero','cajero@test.com','Cajero123!'],
-   ['cocinero','cocinero@test.com','Cocinero123!'],['mesero','mesero@test.com','Mesero123!']],
-  [80,200,130]);
-np();
-
-// ═══════════ 3. DASHBOARD ═══════════
-h1('3. Dashboard');
-txt('Resumen del negocio en tiempo real: ingresos del d\u00eda, transacciones, ticket promedio y pedidos pendientes. Datos actualizados v\u00eda WebSocket.');
-pic('02-dashboard.png', 'Dashboard con KPIs y \u00f3rdenes en curso', 340);
-txt('Acceso r\u00e1pido a POS, Cocina y dem\u00e1s m\u00f3dulos desde tarjetas de acceso directo.');
-np();
-
-// ═══════════ 4. POS ═══════════
-h1('4. POS \u2014 Punto de Venta');
-txt('Registro de ventas r\u00e1pido e intuitivo. Roles: admin y cajero.');
-
-h2('Paso 1: Vista principal');
-pic('pos-main.png', 'Pantalla principal del POS con productos y categor\u00edas', 340);
-txt('Seleccione una mesa para consumo en local o d\u00e9jela vac\u00eda para domicilio. El POS muestra los productos organizados por categor\u00edas.');
-
-sp(0.3);
-h2('Paso 2: Buscar producto');
-pic('pos-search.png', 'B\u00fasqueda de producto por nombre o c\u00f3digo de barras', 340);
-txt('Escriba el nombre del producto o escanee el c\u00f3digo de barras. Los resultados se filtran en tiempo real.');
-
-sp(0.3);
-h2('Paso 3: Agregar al carrito y cobrar');
-pic('pos-cart.png', 'Productos agregados al carrito con selector de pago', 340);
-txt('Ajuste cantidades, seleccione el m\u00e9todo de pago (Efectivo, Transferencia o Mixto) y presione "Cobrar". Con mesa asignada se crea una orden de cocina; sin mesa se genera un domicilio autom\u00e1ticamente.');
-np();
-
-// ═══════════ 5. COCINA ═══════════
-h1('5. Cocina');
-txt('\u00d3rdenes en tiempo real v\u00eda WebSocket. Roles: admin y cocinero.');
-
-h2('Paso 1: Nuevos pedidos');
-txt('Cuando un cajero realiza una venta con mesa, el pedido aparece autom\u00e1ticamente en la columna "Nuevos". El cocinero hace clic en "Aceptar" para iniciar la preparaci\u00f3n.');
-
-h2('Paso 2: En Preparaci\u00f3n');
-txt('El pedido se mueve a la columna central. El cocinero prepara los platos y al finalizar hace clic en "Entregado".');
-
-h2('Paso 3: Entregados');
-pic('04-kitchen.png', 'Panel de cocina con pedidos organizados por estado', 340);
-txt('Los pedidos completados pasan a la columna "Entregados". El cajero los marca como pagados desde Caja. Al llegar un nuevo pedido suena un timbre de notificaci\u00f3n.');
-np();
-
-// ═══════════ 6. DOMICILIOS ═══════════
-h1('6. Domicilios');
-txt('Kanban de entregas en tiempo real. Roles: admin, cajero (lectura), cocinero.');
-
-h2('Paso 1: Pendientes');
-txt('Los domicilios nuevos aparecen en la columna "Pendientes". Acepte el domicilio para iniciar la preparaci\u00f3n.');
-
-h2('Paso 2: En Preparaci\u00f3n');
-txt('Despache el pedido cuando est\u00e9 listo. El sistema asigna un repartidor autom\u00e1ticamente.');
-
-h2('Paso 3: En Camino y Entregados');
-pic('05-domicilios.png', 'Kanban de domicilios con cuatro estados', 340);
-txt('Cuando el repartidor entrega, marque como "Entregado". El hist\u00f3rico completo queda en la \u00faltima columna.');
-np();
-
-// ═══════════ 7. CAJA ═══════════
-h1('7. Caja');
-txt('Apertura y cierre de caja. Roles: admin y cajero.');
-pic('06-caja.png', 'Pantalla de caja con resumen del turno', 340);
-h2('Funciones');
-dot('Abrir caja \u2014 registrar el monto inicial del turno');
-dot('Cerrar caja \u2014 ingresar ingresos/egresos manuales, c\u00e1lculo de diferencia vs ventas');
-dot('Historial \u2014 consultar cierres de caja anteriores con detalle');
-np();
-
-// ═══════════ 8. INVENTARIO ═══════════
-h1('8. Inventario');
-txt('Control de stock. Rol: admin.');
-pic('07-inventario.png', 'Listado de productos del inventario', 340);
-h2('Funciones');
-dot('CRUD completo: nombre, precio, stock, categor\u00eda, c\u00f3digo de barras');
-dot('C\u00f3digo de barras auto-generado por categor\u00eda + proveedor');
-dot('Alertas configurables por stock m\u00ednimo');
-dot('Entradas/salidas manuales con registro hist\u00f3rico');
-dot('Esc\u00e1ner de c\u00f3digo de barras integrado');
-np();
-
-// ═══════════ 9. REPORTES ═══════════
-h1('9. Reportes \u2014 Centro de Inteligencia');
-txt('An\u00e1lisis del negocio en cuatro pesta\u00f1as. Rol: admin. Exportaci\u00f3n a CSV.');
-pic('08-reportes.png', 'Centro de Inteligencia con pesta\u00f1as de an\u00e1lisis', 340);
-h2('Pesta\u00f1as');
-dot('[Ventas] \u2014 KPIs, tendencia, categor\u00edas, m\u00e9todo de pago, horas pico');
-dot('[Inventario] \u2014 valoraci\u00f3n, estado del stock, ganancia potencial');
-dot('[Productos] \u2014 top 10 m\u00e1s vendidos, productos sin movimiento, m\u00e1rgenes');
-dot('[Cocina] \u2014 tiempos de preparaci\u00f3n por cocinero');
-np();
-
-// ═══════════ 10. ALERTAS ═══════════
-h1('10. Alertas');
-txt('Alertas de stock bajo y productos agotados. Roles: admin y cajero.');
-pic('09-alertas.png', 'Panel de alertas con nivel de criticidad', 340);
-h2('Funciones');
-dot('Lista con nivel de criticidad: bajo, cr\u00edtico, agotado');
-dot('Marcar como le\u00eddas (individual o todas)');
-dot('Verificar Stock \u2014 escanea y genera alertas autom\u00e1ticamente');
-dot('Env\u00edo de correo SMTP si est\u00e1 configurado');
-np();
-
-// ═══════════ 11. CONFIGURACIÓN ═══════════
-h1('11. Configuraci\u00f3n');
-txt('Ajustes del sistema. Admin ve todo; cliente solo su perfil.');
-pic('10-configuracion.png', 'P\u00e1gina de configuraci\u00f3n del restaurante', 340);
-h2('Campos para administrador');
-dot('Nombre del establecimiento, tel\u00e9fono, direcci\u00f3n, WhatsApp');
-dot('Logo del restaurante (subida de imagen)');
-dot('Configuraci\u00f3n SMTP: servidor, puerto, credenciales, email');
-dot('Manual de Usuario \u2014 enlace directo al PDF');
-dot('Limpiar Cach\u00e9 Local');
-np();
-
-// ═══════════ 12. FINANZAS ═══════════
-h1('12. Finanzas');
-txt('Panel financiero completo. Rol: admin.');
-pic('11-finanzas.png', 'Panel financiero con P&L y flujo de caja', 340);
-h2('Indicadores');
-dot('Ingresos, costos, gastos y utilidad neta');
-dot('Flujo de caja por per\u00edodo');
-dot('Estado de P\u00e9rdidas y Ganancias mensual');
-dot('Gr\u00e1ficos de ingresos vs gastos');
-np();
-
-// ═══════════ 13. STAFF ═══════════
-h1('13. Personal y Usuarios');
-txt('Gesti\u00f3n del equipo y cuentas. Rol: admin.');
-pic('12-staff.png', 'Gesti\u00f3n de personal y usuarios', 340);
-dot('Empleados \u2014 datos laborales: nombre, cargo, salario, contacto');
-dot('Usuarios del Sistema \u2014 CRUD con roles: admin, cajero, cocinero, mesero, cliente');
-np();
-
-// ═══════════ 14. TALONARIOS ═══════════
-h1('14. Talonarios');
-txt('Control de facturaci\u00f3n. Roles: admin y cajero.');
-pic('13-talonarios.png', 'Registro de talonarios', 340);
-dot('Rangos num\u00e9ricos (desde/hasta)');
-dot('Consumo autom\u00e1tico al realizar ventas');
-dot('Numeraci\u00f3n consecutiva');
-np();
-
-// ═══════════ 15. MÓDULOS ADMIN ═══════════
-h1('15. M\u00f3dulos Administrativos');
-h2('Proveedores');
-txt('CRUD completo de proveedores con datos de contacto, tel\u00e9fono y direcci\u00f3n.');
-h2('Compras');
-txt('\u00d3rdenes de compra con estados: pendiente, recibida, cancelada.');
-h2('Ingredientes');
-txt('Cat\u00e1logo con unidad de medida, costo unitario y stock m\u00ednimo. Base para recetas.');
-h2('Platos (Recetas)');
-txt('Cada plato se compone de ingredientes con cantidades. Costo y precio calculados autom\u00e1ticamente.');
-pic('17-platos.png', 'Gesti\u00f3n de platos con recetas e ingredientes', 340);
-h2('Gastos');
-txt('Gastos operativos categorizados con reportes mensuales.');
-np();
-
-// ═══════════ 16. FUNCIONALIDADES ═══════════
-h1('16. Funcionalidades Transversales');
-h2('WebSocket \u2014 Tiempo Real');
-txt('Socket.IO para actualizaciones en cocina, domicilios y dashboard. Indicador verde = conectado.');
-h2('Notificaci\u00f3n Sonora');
-txt('Timbre al llegar nuevo pedido a cocina v\u00eda Web Audio API.');
-h2('Cach\u00e9 Inteligente');
-txt('Almacenamiento en memoria + localStorage con TTL: productos 5 min, categor\u00edas 10 min, alertas 2 min, config 30 min, reportes 5 min.');
-txt('\u00daselo el bot\u00f3n "Limpiar Cach\u00e9 Local" en Configuraci\u00f3n para forzar recarga.');
-h2('Exportaci\u00f3n CSV');
-txt('Cada pesta\u00f1a de Reportes tiene bot\u00f3n de exportaci\u00f3n CSV con BOM UTF-8 para Excel.');
-h2('Alertas por Correo');
-txt('Con SMTP configurado, al verificar stock se env\u00eda correo autom\u00e1tico con productos cr\u00edticos.');
-np();
-
-// ═══════════ 17. SOLUCIÓN DE PROBLEMAS ═══════════
-h1('17. Soluci\u00f3n de Problemas');
-tbl(['Problema','Soluci\u00f3n'],
-  [['No carga el dashboard','Verificar conexi\u00f3n. Cerrar sesi\u00f3n y reiniciar.'],
-   ['Pedidos no aparecen en cocina','Revisar conexi\u00f3n WebSocket. Recargar p\u00e1gina.'],
-   ['No llegan correos de alerta','Configurar SMTP en Settings.'],
-   ['Datos desactualizados','Settings > Limpiar Cach\u00e9 Local.'],
-   ['Error 403','Rol sin permisos. Contactar al admin.'],
-   ['Error 401','Sesi\u00f3n expirada. Iniciar sesi\u00f3n.'],
-   ['Stock insuficiente','Revisar inventario y realizar compra.'],
-   ['No puedo iniciar sesi\u00f3n','Verificar credenciales. Contactar al admin.'],
-   ['Error interno','Esperar e intentar de nuevo. Reportar si persiste.']],
-  [170,340]);
-sp(0.4);
-h2('Recomendaciones');
-dot('Mantener sesi\u00f3n activa \u2014 la inactividad prolongada cierra la sesi\u00f3n');
-dot('Usar Chrome o Edge actualizados');
-dot('Verificar el indicador de conexi\u00f3n WebSocket antes de reportar problemas');
-dot('Limpiar cach\u00e9 peri\u00f3dicamente');
-np();
-
-// ═══════════ 18. URLs ═══════════
-h1('18. URLs de Referencia');
-tbl(['Recurso','URL'],
-  [['App Frontend','https://lasoupealoignon.vercel.app'],
-   ['API Backend','https://demorestbknd.onrender.com'],
-   ['Health Check','https://demorestbknd.onrender.com/api/health'],
-   ['Repositorio','https://github.com/CrisAguirre/demorest']],
-  [130,380]);
-sp(1.5);
-doc.fontSize(13).font('Helvetica-Bold').fillColor(gold).text('La Soupe \u00e0 l\'Oignon', 55, doc.y, { align: 'center' });
-sp(0.3);
-doc.fontSize(9).font('Helvetica').fillColor(gray).text('Buen provecho y excelentes ventas.', { align: 'center' });
-doc.fontSize(7).fillColor('#AAA').text(`Documento generado el ${date}`, { align: 'center' });
+// Finalizar documento
 doc.end();
-console.log('PDF generado:', OUT);
+
+writeStream.on('finish', () => {
+  console.log('✅ PDF generado con éxito en:', OUT);
+  try {
+    if (fs.existsSync(FRONTEND_ASSETS)) {
+      const copyDest1 = path.join(FRONTEND_ASSETS, 'manual.pdf');
+      const copyDest2 = path.join(FRONTEND_ASSETS, 'MANUAL_USUARIO.pdf');
+      fs.copyFileSync(OUT, copyDest1);
+      fs.copyFileSync(OUT, copyDest2);
+      console.log('✅ PDF copiado exitosamente a frontend assets:');
+      console.log('   ->', copyDest1);
+      console.log('   ->', copyDest2);
+    }
+  } catch (err) {
+    console.error('⚠️ Error al copiar a frontend assets:', err.message);
+  }
+});
