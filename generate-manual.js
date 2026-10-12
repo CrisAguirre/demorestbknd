@@ -6,7 +6,7 @@ const doc = new PDFDocument({
   size: 'LETTER',
   margins: { top: 48, bottom: 50, left: 50, right: 50 },
   info: {
-    Title: "Manual de Usuario - La Soupe à l'Oignon & Marie Antoinette",
+    Title: "Manual de Usuario - Sistema de Gestión Integral para Restaurantes",
     Author: "Equipo de Desarrollo La Soupe à l'Oignon",
     Subject: "Manual Oficial del Sistema v2.0",
     Keywords: "restaurante, pos, dashboard, cocina, inventario, caja"
@@ -170,12 +170,10 @@ doc.strokeColor(gold).lineWidth(0.4).rect(32, 32, doc.page.width - 64, doc.page.
 doc.fillColor(gold).rect(32, 160, doc.page.width - 64, 2.5).fill();
 
 // Título principal
-doc.fillColor(gold).fontSize(38).font('Helvetica-Bold').text('La Soupe', 0, 205, { align: 'center' });
-doc.fontSize(38).text("à l'Oignon", 0, 250, { align: 'center' });
-doc.fontSize(14).font('Helvetica-Oblique').fillColor('#E5D392').text('& Marie Antoinette', 0, 300, { align: 'center' });
-
-doc.fillColor('#FFFFFF').fontSize(18).font('Helvetica-Bold').text('MANUAL OFICIAL DE USUARIO', 0, 360, { align: 'center' });
-doc.fillColor('#A4B0C6').fontSize(10).font('Helvetica').text('Sistema Integral de Gestión Restaurantera y Salón de Té', 0, 390, { align: 'center' });
+doc.fillColor(gold).fontSize(30).font('Helvetica-Bold').text('Sistema de Gestión Integral', 0, 215, { align: 'center' });
+doc.fontSize(22).font('Helvetica').fillColor('#FFFFFF').text('para Restaurantes', 0, 260, { align: 'center' });
+doc.fillColor('#E5D392').fontSize(16).font('Helvetica-Bold').text('MANUAL DE USUARIO', 0, 340, { align: 'center' });
+doc.fillColor('#A4B0C6').fontSize(10).font('Helvetica').text('Guía Oficial Operativa y Administrativa', 0, 380, { align: 'center' });
 
 // Tarjeta central de versión
 doc.fillColor(surface).rect(160, 440, doc.page.width - 320, 75).fill();
@@ -474,13 +472,13 @@ tbl(
     ['Frontend de Producción', 'https://lasoupealoignon.vercel.app', 'Aplicación web oficial'],
     ['API Backend (Render)', 'https://demorestbknd.onrender.com/api', 'Servicios REST y Socket.IO'],
     ['Health Check Backend', 'https://demorestbknd.onrender.com/api/health', 'Monitor de estado del servidor'],
-    ['Sitio Web Comercial', 'https://www.restmarieantoinette.com', 'Carta digital y reservas']
+    ['Frontend de Producción', 'https://lasoupealoignon.vercel.app', 'Aplicación web oficial']
   ],
   [130, 232, 150]
 );
 
 sp(1.2);
-doc.fontSize(12).font('Helvetica-Bold').fillColor(gold).text("La Soupe à l'Oignon & Marie Antoinette", 50, doc.y, { align: 'center' });
+doc.fontSize(12).font('Helvetica-Bold').fillColor(gold).text("Sistema de Gestión Integral para Restaurantes", 50, doc.y, { align: 'center' });
 doc.moveDown(0.2);
 doc.fontSize(8.5).font('Helvetica-Oblique').fillColor(gray).text('Tradición culinaria francesa & excelencia operativa digital.', { align: 'center' });
 doc.moveDown(0.2);
